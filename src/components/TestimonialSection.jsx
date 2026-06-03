@@ -55,7 +55,7 @@ const TestimonialSection = () => {
           A place that grows in value while giving peace today.
         </p>
 
-      <h6>Lorem ipsum dolor sit amet consectetur adipisicing elit. Accusamus minus neque accusantium quibusdam sequi veritatis, deleniti doloribus quia fugit et autem incidunt exercitationem minima, quos rem nobis voluptatibus ex praesentium.</h6>
+      {/* <h6>Lorem ipsum dolor sit amet consectetur adipisicing elit. Accusamus minus neque accusantium quibusdam sequi veritatis, deleniti doloribus quia fugit et autem incidunt exercitationem minima, quos rem nobis voluptatibus ex praesentium.</h6> */}
 
        <a   href="#"
           className="text-white/80 hover:text-white transition-colors"
