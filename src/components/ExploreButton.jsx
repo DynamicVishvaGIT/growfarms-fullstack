@@ -11,7 +11,7 @@ const ExploreButton = () => {
         bottom: "2.5rem",       // adjust to taste
         left: "50%",
         transform: "translateX(-50%)",
-        zIndex: 9999,
+        zIndex: 999,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

@@ -203,7 +203,7 @@ export default function AerialMapSection() {
 
       {/* ── DESKTOP DRAWER ── */}
       <div
-        className="fixed top-0 right-0 h-full z-50 hidden sm:flex flex-col"
+        className="fixed top-0 right-0 h-full z-[999] hidden sm:flex flex-col"
         style={{
           width: "clamp(260px, 40%, 400px)",
           background: "#DDEADF",
@@ -268,7 +268,7 @@ export default function AerialMapSection() {
       {/* ── MOBILE BOTTOM SHEET ── */}
       <>
         <div
-          className="fixed inset-0 z-40 sm:hidden transition-opacity duration-300"
+          className="fixed inset-0 z-[9999] sm:hidden transition-opacity duration-300"
           style={{
             background: "rgba(0,0,0,0.45)",
             opacity: activePin ? 1 : 0,
@@ -277,7 +277,7 @@ export default function AerialMapSection() {
           onClick={() => setActivePin(null)}
         />
         <div
-          className="fixed bottom-0 left-0 right-0 z-50 sm:hidden rounded-t-2xl overflow-hidden"
+          className="fixed bottom-0 left-0 right-0 z-[9999] sm:hidden rounded-t-2xl overflow-hidden"
           style={{
             background: "rgba(240,245,241,0.98)",
             backdropFilter: "blur(20px)",
