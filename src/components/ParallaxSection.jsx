@@ -113,7 +113,7 @@ const ParallaxSection = () => {
           alt=""
           draggable={false}
           className="absolute bottom-0 left-0 z-10 w-full object-cover object-top pointer-events-none select-none"
-          style={{ height: "clamp(160px, 35vw, 500px)" }}
+          style={{ height: "clamp(193px, 35vw, 687px)" }}
         />
 
       </div>

@@ -20,3 +20,18 @@
 .green-overlay {
   background: linear-gradient(180deg, rgba(49, 85, 55, 0) 0%, #315537 100%);
 }
+
+/* Hide scrollbar for Chrome, Safari, Edge */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for Firefox */
+* {
+  scrollbar-width: none;
+}
+
+/* Hide scrollbar for IE/Edge legacy */
+* {
+  -ms-overflow-style: none;
+}

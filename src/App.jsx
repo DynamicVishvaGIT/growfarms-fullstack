@@ -1,3 +1,4 @@
+import ExploreButton from './components/ExploreButton';
 import useSmoothScroll from './hooks/useSmoothScroll';
 import Home from './pages/Home';
 
@@ -7,6 +8,7 @@ const App = () => {
 
   return (
     <>
+    <ExploreButton />
     <Home/> 
     </>
   )

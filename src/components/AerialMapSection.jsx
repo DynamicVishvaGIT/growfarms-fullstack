@@ -103,6 +103,7 @@ export default function AerialMapSection() {
           height: "20%",
           background:
             "linear-gradient(180deg, rgba(49,85,55,0) 0%, #315537 100%)",
+            zIndex:900
         }}
       />
 
@@ -230,7 +231,6 @@ export default function AerialMapSection() {
                 className="text-[#1a3d22] mb-3"
                 style={{
                   fontSize: "clamp(1.3rem, 2.5vw, 1.8rem)",
-                  fontFamily: "'Georgia', serif",
                   fontWeight: 600,
                 }}
               >

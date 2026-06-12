@@ -1,5 +1,6 @@
 import React from 'react'
 import landscape_img from "../assets/images/home_banner_3.jpg" // use your aerial image
+import Carousel3D from '../components/Testimonial(3D)'
 
 const TestimonialSection = () => {
   return (
@@ -19,7 +20,7 @@ const TestimonialSection = () => {
         style={{
           height: "20%",
           background: "linear-gradient(180deg, #315537 0%, rgba(49,85,55,0.92) 40%, rgba(49,85,55,0.55) 80%, rgba(49,85,55,0) 100%)",
-          zIndex: 1,
+          zIndex: 900,
         }}
       />
 
@@ -35,8 +36,8 @@ const TestimonialSection = () => {
 
       {/* Content */}
       <div
-        className="relative flex flex-col items-center px-4 sm:px-6 pt-16 pb-16 md:pt-20 md:pb-20"
-        style={{ zIndex: 2 }}
+        className="relative flex flex-col items-center pt-16 pb-16 md:pt-20 md:pb-20"
+        style={{ zIndex: 900 }}
       >
         <h2
           className="text-white text-center"
@@ -55,7 +56,7 @@ const TestimonialSection = () => {
           A place that grows in value while giving peace today.
         </p>
 
-      {/* <h6>Lorem ipsum dolor sit amet consectetur adipisicing elit. Accusamus minus neque accusantium quibusdam sequi veritatis, deleniti doloribus quia fugit et autem incidunt exercitationem minima, quos rem nobis voluptatibus ex praesentium.</h6> */}
+    <Carousel3D/>
 
        <a   href="#"
           className="text-white/80 hover:text-white transition-colors"

@@ -9,72 +9,130 @@ import video     from "../assets/video/video_scroll_seekable.mp4";
 
 gsap.registerPlugin(ScrollTrigger);
 
-/*
-  SCROLL LAYOUT  (total = 400vh)
-  ──────────────────────────────────────────────
-   0vh → 300vh  video scrub   (75% of scroll)
-  300vh → 400vh  clouds slide in from both sides
-  ──────────────────────────────────────────────
-  FIX 1: Mobile left cloud was `fixed` → changed to `absolute`
-  FIX 2: Cleanup only kills this component's own ScrollTrigger
-  FIX 3: Added loadedmetadata fallback for duration
-  FIX 4: Abort flag to prevent setState on unmounted component
-  FIX 5: Wider seek threshold on mobile to reduce jank
-*/
+// ── Scroll budget breakdown ──────────────────────────────────────────────────
+// 700vh total:
+//   0   → 300vh  (progress 0.00 → 0.43)  →  video scrubs
+//   300 → 700vh  (progress 0.43 → 1.00)  →  clouds slide in over 4 full scrolls
+//
+// Why 700vh?
+//   Video phase : 300vh  (3 viewport-height scroll steps, feels natural)
+//   Cloud phase : 400vh  (4 viewport-height scroll steps, one per 25% of cloud)
+// ─────────────────────────────────────────────────────────────────────────────
+const PIN_HEIGHT = "700vh";
 
-const PIN_HEIGHT = "400vh";
+// Progress split points
+const VIDEO_END  = 3 / 7;   // 300vh / 700vh ≈ 0.4286 — video finishes here
+const CLOUD_START = VIDEO_END;
+const CLOUD_RANGE = 1 - CLOUD_START; // 4/7 ≈ 0.5714 — cloud window
+
+// Inline-style cloud update — avoids gsap.set() allocation on every frame
+const applyCloudStyle = (el, xPercent, opacity) => {
+  if (!el) return;
+  el.style.transform = `translateX(${xPercent}%)`;
+  el.style.opacity   = opacity;
+};
 
 const HomeBanner = () => {
   const [navOpen, setNavOpen] = useState(false);
   const [ready,   setReady]   = useState(false);
 
-  const pinWrapRef      = useRef(null);
-  const stickyRef       = useRef(null);
-  const videoRef        = useRef(null);
-  const triggerRef      = useRef(null);
+  const pinWrapRef  = useRef(null);
+  const stickyRef   = useRef(null);
+  const videoRef    = useRef(null);
+  const triggerRef  = useRef(null);
 
-  // Four cloud divs — each gets its own ref so GSAP can target individually
+  // RAF throttle refs — prevent flooding the browser with seek calls
+  const rafPendingRef    = useRef(false);
+  const pendingTargetRef = useRef(0);
+
+  // Prevent setupTriggers() from running twice
+  // (both loadedmetadata + canplaythrough can fire on iOS)
+  const setupDoneRef = useRef(false);
+
+  // Device detection
+  const isIOS    = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isMobile = isIOS || /Android/i.test(navigator.userAgent);
+
+  // Seek threshold — lower = more responsive scrubbing.
+  // iOS needs a slightly larger gap to avoid decode queue stalls.
+  const SEEK_THRESHOLD = isIOS ? 0.04 : isMobile ? 0.033 : 0.016;
+
+  // Four cloud containers — mobile and desktop variants for left and right
   const cloudLMobRef  = useRef(null);
   const cloudLDeskRef = useRef(null);
   const cloudRMobRef  = useRef(null);
   const cloudRDeskRef = useRef(null);
 
+  // ── Dynamic --vh fix ─────────────────────────────────────────────────────
+  // On mobile, the browser URL bar shrinks/expands on scroll, making
+  // 100vh unreliable. We compute the real viewport height once and on resize.
+  useEffect(() => {
+    const setVh = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty("--vh", `${vh}px`);
+    };
+    setVh();
+    window.addEventListener("resize", setVh, { passive: true });
+    return () => window.removeEventListener("resize", setVh);
+  }, []);
+
+  // ── RAF-throttled seek ──────────────────────────────────────────────────
+
+  const seekVideo = (videoEl, target) => {
+    pendingTargetRef.current = target;
+    if (rafPendingRef.current) return; // already a frame queued, just update target
+    rafPendingRef.current = true;
+
+    requestAnimationFrame(() => {
+      rafPendingRef.current = false;
+      const delta = Math.abs(videoEl.currentTime - pendingTargetRef.current);
+      if (delta > SEEK_THRESHOLD) {
+        // fastSeek is less precise but much faster on Safari / Firefox
+        if (typeof videoEl.fastSeek === "function") {
+          videoEl.fastSeek(pendingTargetRef.current);
+        } else {
+          videoEl.currentTime = pendingTargetRef.current;
+        }
+      }
+    });
+  };
+
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
 
-    // FIX 4: abort flag so we don't setState after unmount
     let destroyed = false;
-
-    // Ease-in-out-quad for smooth cloud animation
-    const easeInOutQuad = (t) =>
-      t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-    // FIX 5: wider seek threshold on mobile (avoids jank from too-frequent seeks)
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const SEEK_THRESHOLD = isMobile ? 0.05 : 0.016;
 
     const setupTriggers = () => {
       if (destroyed) return;
 
       const dur = videoEl.duration;
-
-      // FIX 3: if duration still not available here, bail cleanly
       if (!dur || isNaN(dur)) return;
 
       videoEl.currentTime = 0;
-      if (!destroyed) setReady(true);
+      setReady(true);
 
-      // ── Initial cloud state: hidden off-screen ──────────
-      [cloudLMobRef, cloudLDeskRef].forEach(({ current }) => {
-        if (current) gsap.set(current, { xPercent: -130, opacity: 0 });
+      // ── Initial cloud state: hidden, fully off-screen ──
+      [cloudLMobRef, cloudLDeskRef].forEach(({ current: el }) => {
+        if (el) {
+          el.style.transform  = "translateX(-130%)";
+          el.style.opacity    = "0";
+          el.style.willChange = "transform, opacity";
+        }
       });
-      [cloudRMobRef, cloudRDeskRef].forEach(({ current }) => {
-        if (current) gsap.set(current, { xPercent: 130, opacity: 0 });
+      [cloudRMobRef, cloudRDeskRef].forEach(({ current: el }) => {
+        if (el) {
+          el.style.transform  = "translateX(130%)";
+          el.style.opacity    = "0";
+          el.style.willChange = "transform, opacity";
+        }
       });
 
-      // Kill only this component's trigger before recreating
-      if (triggerRef.current) triggerRef.current.kill();
+      // Kill any existing trigger before creating a new one
+      if (triggerRef.current) {
+        triggerRef.current.kill();
+        triggerRef.current = null;
+      }
 
       triggerRef.current = ScrollTrigger.create({
         trigger      : pinWrapRef.current,
@@ -82,118 +140,127 @@ const HomeBanner = () => {
         end          : "bottom bottom",
         pin          : stickyRef.current,
         anticipatePin: 1,
-
-        // FIX 5: use pinSpacing instead of fighting overflow in onRefresh
-        pinSpacing: true,
+        pinSpacing   : false, // wrapper already has 700vh; don't add extra spacer
 
         onUpdate(self) {
-          const p = self.progress; // 0 → 1
+          const p = self.progress; // 0.0 → 1.0 across 700vh
 
-          // ── Video: maps progress 0→0.75 to full duration ──
-          const videoP  = Math.min(p / 0.75, 1);
-          const target  = Math.min(Math.max(videoP * dur, 0), dur - 0.05);
-          if (Math.abs(videoEl.currentTime - target) > SEEK_THRESHOLD) {
-            videoEl.currentTime = target;
-          }
+          // ── Video scrub: 0 → VIDEO_END (0→300vh) maps to full video ──
+          // Clamp to dur - 0.1: safety margin so we never overshoot the
+          // last real frame (browser duration can float slightly above actual).
+          const videoP = Math.min(p / VIDEO_END, 1);
+          const target = Math.min(Math.max(videoP * dur, 0), dur - 0.1);
+          seekVideo(videoEl, target);
 
-          // ── Clouds: progress 0.75→1.0 ─────────────────────
-          const rawCloud = Math.max((p - 0.75) / 0.25, 0); // 0→1
-          const cloudP   = easeInOutQuad(rawCloud);
+          // ── Clouds: CLOUD_START → 1.0 (300vh → 700vh = 4 full scrolls) ──
+          // Linear — each viewport-height scroll moves clouds exactly 25%.
+          // Scroll 1 → 25% in  |  Scroll 2 → 50% in
+          // Scroll 3 → 75% in  |  Scroll 4 → fully in
+          const rawCloud = Math.max((p - CLOUD_START) / CLOUD_RANGE, 0);
+          const cloudP   = Math.min(rawCloud, 1); // linear, no easing
 
-          // Left clouds: xPercent -130 → 0
-          [cloudLMobRef, cloudLDeskRef].forEach(({ current }) => {
-            if (!current) return;
-            gsap.set(current, {
-              xPercent: -130 + cloudP * 130,
-              opacity : cloudP,
-            });
-          });
-
-          // Right clouds: xPercent 130 → 0
-          [cloudRMobRef, cloudRDeskRef].forEach(({ current }) => {
-            if (!current) return;
-            gsap.set(current, {
-              xPercent: 130 - cloudP * 130,
-              opacity : cloudP,
-            });
-          });
+          applyCloudStyle(cloudLMobRef.current,  -130 + cloudP * 130, cloudP);
+          applyCloudStyle(cloudLDeskRef.current, -130 + cloudP * 130, cloudP);
+          applyCloudStyle(cloudRMobRef.current,   130 - cloudP * 130, cloudP);
+          applyCloudStyle(cloudRDeskRef.current,  130 - cloudP * 130, cloudP);
         },
       });
     };
 
-    // FIX 3: try both readyState and loadedmetadata for duration availability
+    // ── Video setup ─────────────────────────────────────────────────────────
+    // Guard: both loadedmetadata and canplaythrough can fire on iOS Safari.
+    // setupDoneRef ensures we only run setup once regardless of which fires.
     const trySetup = () => {
+      if (destroyed || setupDoneRef.current) return;
       const dur = videoEl.duration;
-      if (dur && !isNaN(dur)) {
-        setupTriggers();
-      } else {
-        videoEl.addEventListener("loadedmetadata", setupTriggers, { once: true });
-      }
+      if (!dur || isNaN(dur)) return; // not ready yet, wait for next event
+      setupDoneRef.current = true;
+
+      videoEl
+        .play()
+        .then(() => {
+          videoEl.pause();
+          videoEl.currentTime = 0;
+          setupTriggers();
+        })
+        .catch(() => {
+          // Autoplay blocked (common on desktop) — still set up triggers
+          setupTriggers();
+        });
     };
 
-    const onReady = () => {
-      videoEl.play().then(() => {
-        videoEl.pause();
-        videoEl.currentTime = 0;
-        trySetup();
-      }).catch(() => {
-        // Autoplay blocked (common on iOS without interaction)
-        // Still set up triggers; seeking will work once user scrolls
-        trySetup();
-      });
-    };
-
-    if (videoEl.readyState >= 4) {
-      onReady();
+    if (videoEl.readyState >= 1 && !isNaN(videoEl.duration)) {
+      trySetup();
     } else {
-      videoEl.addEventListener("canplaythrough", onReady, { once: true });
+      // loadedmetadata fires first and is enough on most browsers
+      videoEl.addEventListener("loadedmetadata", trySetup, { once: true });
+      // canplaythrough is the reliable fallback on iOS Safari
+      videoEl.addEventListener("canplaythrough", trySetup, { once: true });
     }
 
-    // FIX 2: only kill this component's own trigger, not ALL triggers
     return () => {
       destroyed = true;
-      videoEl.removeEventListener("canplaythrough", onReady);
-      videoEl.removeEventListener("loadedmetadata", setupTriggers);
+      rafPendingRef.current = false;
+      videoEl.removeEventListener("loadedmetadata", trySetup);
+      videoEl.removeEventListener("canplaythrough", trySetup);
       if (triggerRef.current) {
         triggerRef.current.kill();
         triggerRef.current = null;
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
-      {/* ── 400vh scroll budget ── */}
+      {/* ── 700vh scroll budget ── */}
       <div
         ref={pinWrapRef}
         className="overflow-visible"
         style={{ height: PIN_HEIGHT, position: "relative", zIndex: 30 }}
       >
 
-        {/* ── Sticky viewport ── */}
+        {/* ── Sticky viewport ──
+            height uses --vh custom property so it matches the real
+            visual viewport on mobile (not affected by URL bar resize).
+            overflow:visible is explicit — GSAP pin can apply overflow:hidden
+            which would clip clouds that start off-screen at ±130%.
+        ── */}
         <div
           ref={stickyRef}
-          className="relative w-full overflow-visible"
-          style={{ height: "100vh" }}
+          className="relative w-full"
+          style={{
+            height  : "calc(var(--vh, 1vh) * 100)",
+            overflow: "visible",
+          }}
         >
-          {/* ── Video ── */}
+
+          {/* ── Video ──
+              - webkit-playsinline needed for older iOS versions
+              - x-webkit-airplay="deny" prevents AirPlay popup on iOS
+              - preload="auto" tells browser to buffer the whole file
+              - touchAction: none stops iOS from treating video
+                area as a scroll-capture zone
+          ── */}
           <video
             ref={videoRef}
             src={video}
             className="absolute inset-0 w-full h-full object-cover"
             style={{
-              opacity   : ready ? 1 : 0,
-              transition: "opacity 0.4s ease",
-              willChange: "opacity",
+              opacity    : ready ? 1 : 0,
+              transition : "opacity 0.4s ease",
+              willChange : "opacity",
+              touchAction: "none",
             }}
             muted
             playsInline
             preload="auto"
             disablePictureInPicture
             disableRemotePlayback
+            webkit-playsinline="true"
+            x-webkit-airplay="deny"
           />
 
-          {/* Fallback dark green bg until video loads */}
+          {/* ── Fallback dark-green bg shown until video is ready ── */}
           <div
             className="absolute inset-0"
             style={{
@@ -227,7 +294,7 @@ const HomeBanner = () => {
             />
           </div>
 
-          {/* ── Hero text + nav ── */}
+          {/* ── Hero text ── */}
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-4 sm:px-6 select-none">
             <h1
               className="text-white"
@@ -253,119 +320,64 @@ const HomeBanner = () => {
               <br className="hidden sm:block" />
               investment, and future generations.
             </p>
-
-            {/* Nav + Explore */}
-            <div className="flex flex-col items-center">
-              <nav
-                className={`flex items-center gap-1 rounded-full px-4 py-2
-                  bg-white/85 backdrop-blur-md
-                  shadow-[0_8px_32px_rgba(0,0,0,0.18)]
-                  transition-all duration-[380ms] ease-[cubic-bezier(.4,0,.2,1)]
-                  ${navOpen
-                    ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
-                    : "opacity-0 -translate-y-4 scale-95 pointer-events-none absolute"
-                  }`}
-              >
-                {["Home", "About Us", "Blogs", "Testimonials", "Contact Us"].map((item) => (
-                  <a
-                    key={item}
-                    href="#"
-                    className="text-[#2a2a2a] font-medium rounded-full
-                      hover:bg-black/7 transition-colors duration-200 whitespace-nowrap
-                      text-[0.72rem] px-2 py-1
-                      md:text-[0.88rem] md:px-3 md:py-1.5"
-                  >
-                    {item}
-                  </a>
-                ))}
-              </nav>
-
-              <div className="mt-6">
-                {navOpen ? (
-                  <button
-                    onClick={() => setNavOpen(false)}
-                    aria-label="Close menu"
-                    className="w-[44px] h-[44px] rounded-full
-                      border border-white/30 bg-white/15 backdrop-blur-md
-                      flex items-center justify-center
-                      cursor-pointer hover:bg-white/25 hover:rotate-90
-                      transition-all duration-200"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                      stroke="white" strokeWidth="2.2" strokeLinecap="round">
-                      <line x1="5" y1="5" x2="19" y2="19" />
-                      <line x1="19" y1="5" x2="5" y2="19" />
-                    </svg>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setNavOpen(true)}
-                    aria-label="Open navigation"
-                    className="flex flex-col items-center cursor-pointer border-none bg-transparent"
-                  >
-                    <div className="relative flex items-center justify-center">
-                      <span
-                        className="absolute w-[64px] h-[64px] rounded-full border-2 border-white/50 animate-ping"
-                        style={{ animationDuration: "2.4s" }}
-                      />
-                      <div
-                        className="w-[50px] h-[50px] rounded-full flex items-center justify-center
-                          transition-transform duration-[280ms] hover:scale-105"
-                        style={{
-                          background    : "rgba(255,255,255,0.22)",
-                          backdropFilter: "blur(10px)",
-                        }}
-                      >
-                        <div
-                          className="w-8 h-8 rounded-full bg-white flex items-center justify-center"
-                          style={{ boxShadow: "inset 0 2px 8px rgba(0,0,0,0.1)" }}
-                        >
-                          <img src={logo} alt="logo" className="w-5 h-5 object-contain" />
-                        </div>
-                      </div>
-                    </div>
-                    <span
-                      className="mt-3 text-white tracking-[0.14em]"
-                      style={{
-                        fontSize  : "1rem",
-                        fontWeight: "400",
-                        textShadow: "0 2px 12px rgba(0,0,0,0.3)",
-                        userSelect: "none",
-                      }}
-                    >
-                      Explore
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
 
-          {/* Left — mobile  ✅ FIX: was `fixed`, now `absolute` */}
+          {/* ── CLOUD ELEMENTS ── */}
+
+          {/* Left — mobile */}
           <div
             ref={cloudLMobRef}
             className="absolute pointer-events-none md:hidden"
-            style={{ bottom: "-5%", left: "-10%", width: "280px", zIndex: 40 }}
+            style={{
+              bottom   : "-5%",
+              left     : "-10%",
+              width    : "280px",
+              zIndex   : 40,
+              opacity  : 0,
+              transform: "translateX(-130%)",
+            }}
           >
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain"
-              style={{ transform: "scaleX(-1)" }} />
+            <img
+              src={cloude_1}
+              alt=""
+              className="w-full h-auto object-contain"
+              style={{ transform: "scaleX(-1)" }}
+            />
           </div>
 
           {/* Left — desktop */}
           <div
             ref={cloudLDeskRef}
             className="absolute pointer-events-none hidden md:block"
-            style={{ bottom: "-28%", left: "-40%", width: "clamp(700px, 100vw, 1800px)", zIndex: 40 }}
+            style={{
+              bottom   : "-28%",
+              left     : "-40%",
+              width    : "clamp(700px, 100vw, 1800px)",
+              zIndex   : 40,
+              opacity  : 0,
+              transform: "translateX(-130%)",
+            }}
           >
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain"
-              style={{ transform: "scaleX(-1)" }} />
+            <img
+              src={cloude_1}
+              alt=""
+              className="w-full h-auto object-contain"
+              style={{ transform: "scaleX(-1)" }}
+            />
           </div>
 
           {/* Right — mobile */}
           <div
             ref={cloudRMobRef}
             className="absolute pointer-events-none md:hidden"
-            style={{ bottom: "-5%", right: "-10%", width: "280px", zIndex: 40 }}
+            style={{
+              bottom   : "-5%",
+              right    : "-10%",
+              width    : "280px",
+              zIndex   : 40,
+              opacity  : 0,
+              transform: "translateX(130%)",
+            }}
           >
             <img src={cloude_1} alt="" className="w-full h-auto object-contain" />
           </div>
@@ -374,7 +386,14 @@ const HomeBanner = () => {
           <div
             ref={cloudRDeskRef}
             className="absolute pointer-events-none hidden md:block"
-            style={{ bottom: "-28%", right: "-40%", width: "clamp(700px,100vw,1800px)", zIndex: 40 }}
+            style={{
+              bottom   : "-28%",
+              right    : "-40%",
+              width    : "clamp(700px, 100vw, 1800px)",
+              zIndex   : 40,
+              opacity  : 0,
+              transform: "translateX(130%)",
+            }}
           >
             <img src={cloude_1} alt="" className="w-full h-auto object-contain" />
           </div>
