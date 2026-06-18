@@ -8,7 +8,7 @@ const ExploreButton = () => {
     <div
       style={{
         position: "fixed",
-        bottom: "2.5rem",       // adjust to taste
+        bottom: "2.5rem",       
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 999,

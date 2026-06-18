@@ -5,25 +5,27 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import logo_img from "../assets/images/grow-farms-logo.png";
 import cloude_1  from "../assets/images/cloude_1.png";
 import logo      from "../assets/images/logo_1.png";
-import video     from "../assets/video/video_scroll_seekable.mp4";
+import video     from "../assets/video/final_loop (2).mp4";
 
 gsap.registerPlugin(ScrollTrigger);
 
 // ── Scroll budget breakdown ──────────────────────────────────────────────────
-// 700vh total:
-//   0   → 300vh  (progress 0.00 → 0.43)  →  video scrubs
-//   300 → 700vh  (progress 0.43 → 1.00)  →  clouds slide in over 4 full scrolls
+// Desktop: 700vh total | Mobile: 350vh total (half — mobile doesn't need
+// 4 full scrolls of cloud drift, it feels way too long/slow on a phone)
+//   0%   → 43%  (VIDEO_END)  →  video scrubs
+//   43%  → 100%               →  clouds slide in
 //
-// Why 700vh?
-//   Video phase : 300vh  (3 viewport-height scroll steps, feels natural)
-//   Cloud phase : 400vh  (4 viewport-height scroll steps, one per 25% of cloud)
+// Why these numbers?
+//   Video phase : ~43% of scroll (3/7)
+//   Cloud phase : ~57% of scroll (4/7)
+//   Ratios are device-independent — only the total vh height changes.
 // ─────────────────────────────────────────────────────────────────────────────
-const PIN_HEIGHT = "700vh";
+const getPinHeight = () => (window.innerWidth < 768 ? "350vh" : "700vh");
 
-// Progress split points
-const VIDEO_END  = 3 / 7;   // 300vh / 700vh ≈ 0.4286 — video finishes here
+// Progress split points (ratios — same on mobile & desktop)
+const VIDEO_END   = 3 / 7;          // video finishes here
 const CLOUD_START = VIDEO_END;
-const CLOUD_RANGE = 1 - CLOUD_START; // 4/7 ≈ 0.5714 — cloud window
+const CLOUD_RANGE = 1 - CLOUD_START; // cloud window
 
 // Inline-style cloud update — avoids gsap.set() allocation on every frame
 const applyCloudStyle = (el, xPercent, opacity) => {
@@ -33,8 +35,9 @@ const applyCloudStyle = (el, xPercent, opacity) => {
 };
 
 const HomeBanner = () => {
-  const [navOpen, setNavOpen] = useState(false);
-  const [ready,   setReady]   = useState(false);
+  const [navOpen, setNavOpen]     = useState(false);
+  const [ready,   setReady]       = useState(false);
+  const [pinHeight, setPinHeight] = useState(getPinHeight());
 
   const pinWrapRef  = useRef(null);
   const stickyRef   = useRef(null);
@@ -63,13 +66,15 @@ const HomeBanner = () => {
   const cloudRMobRef  = useRef(null);
   const cloudRDeskRef = useRef(null);
 
-  // ── Dynamic --vh fix ─────────────────────────────────────────────────────
+  // ── Dynamic --vh fix + responsive pin height ────────────────────────────
   // On mobile, the browser URL bar shrinks/expands on scroll, making
   // 100vh unreliable. We compute the real viewport height once and on resize.
+  // We also recompute PIN_HEIGHT here since it depends on window width.
   useEffect(() => {
     const setVh = () => {
       const vh = window.innerHeight * 0.01;
       document.documentElement.style.setProperty("--vh", `${vh}px`);
+      setPinHeight(getPinHeight());
     };
     setVh();
     window.addEventListener("resize", setVh, { passive: true });
@@ -77,7 +82,6 @@ const HomeBanner = () => {
   }, []);
 
   // ── RAF-throttled seek ──────────────────────────────────────────────────
-
   const seekVideo = (videoEl, target) => {
     pendingTargetRef.current = target;
     if (rafPendingRef.current) return; // already a frame queued, just update target
@@ -140,22 +144,21 @@ const HomeBanner = () => {
         end          : "bottom bottom",
         pin          : stickyRef.current,
         anticipatePin: 1,
-        pinSpacing   : false, // wrapper already has 700vh; don't add extra spacer
+        pinSpacing   : false, // wrapper already has full scroll height; don't add extra spacer
 
         onUpdate(self) {
-          const p = self.progress; // 0.0 → 1.0 across 700vh
+          const p = self.progress; // 0.0 → 1.0 across pinHeight
 
-          // ── Video scrub: 0 → VIDEO_END (0→300vh) maps to full video ──
+          // ── Video scrub: 0 → VIDEO_END maps to full video ──
           // Clamp to dur - 0.1: safety margin so we never overshoot the
           // last real frame (browser duration can float slightly above actual).
           const videoP = Math.min(p / VIDEO_END, 1);
           const target = Math.min(Math.max(videoP * dur, 0), dur - 0.1);
           seekVideo(videoEl, target);
 
-          // ── Clouds: CLOUD_START → 1.0 (300vh → 700vh = 4 full scrolls) ──
-          // Linear — each viewport-height scroll moves clouds exactly 25%.
-          // Scroll 1 → 25% in  |  Scroll 2 → 50% in
-          // Scroll 3 → 75% in  |  Scroll 4 → fully in
+          // ── Clouds: CLOUD_START → 1.0 ──
+          // Linear — ratio-based, so it scales correctly whether the
+          // total pin height is 350vh (mobile) or 700vh (desktop).
           const rawCloud = Math.max((p - CLOUD_START) / CLOUD_RANGE, 0);
           const cloudP   = Math.min(rawCloud, 1); // linear, no easing
 
@@ -165,6 +168,9 @@ const HomeBanner = () => {
           applyCloudStyle(cloudRDeskRef.current,  130 - cloudP * 130, cloudP);
         },
       });
+
+      // Recalculate trigger positions since pinHeight may have changed
+      ScrollTrigger.refresh();
     };
 
     // ── Video setup ─────────────────────────────────────────────────────────
@@ -210,13 +216,21 @@ const HomeBanner = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Re-run ScrollTrigger.refresh() whenever pinHeight changes ───────────
+  // (e.g. rotating device, resizing browser across the 768px breakpoint)
+  useEffect(() => {
+    if (triggerRef.current) {
+      ScrollTrigger.refresh();
+    }
+  }, [pinHeight]);
+
   return (
     <>
-      {/* ── 700vh scroll budget ── */}
+      {/* ── Responsive scroll budget: 350vh mobile / 700vh desktop ── */}
       <div
         ref={pinWrapRef}
         className="overflow-visible"
-        style={{ height: PIN_HEIGHT, position: "relative", zIndex: 30 }}
+        style={{ height: pinHeight, position: "relative", zIndex: 30 }}
       >
 
         {/* ── Sticky viewport ──

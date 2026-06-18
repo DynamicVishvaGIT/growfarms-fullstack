@@ -5,34 +5,15 @@ import Carousel3D from '../components/Testimonial(3D)'
 const TestimonialSection = () => {
   return (
     <section
-      className="relative w-full overflow-visible"
+      className="relative w-full"
       style={{ backgroundColor: "#315537" }} // fallback color if image fails to load
     >
       {/* Aerial background image */}
       <div
         className="absolute inset-0 w-full h-full pointer-events-none"
-     
       />
 
-      {/* Top overlay — starts at EXACT #315537 to match ParallaxSection bottom */}
-      <div
-        className="absolute top-0 left-0 w-full pointer-events-none overflow-visible"
-        style={{
-          height: "20%",
-          background: "linear-gradient(180deg, #315537 0%, rgba(49,85,55,0.92) 40%, rgba(49,85,55,0.55) 80%, rgba(49,85,55,0) 100%)",
-          zIndex: 900,
-        }}
-      />
-
-      {/* Bottom overlay — fades back to green */}
-      <div
-        className="absolute bottom-0 left-0 w-full pointer-events-none"
-        style={{
-          height: "45%",
-          background: "linear-gradient(180deg, rgba(49,85,55,0) 0%, rgba(49,85,55,0.85) 60%, #315537 100%)",
-          zIndex: 1,
-        }}
-      />
+   
 
       {/* Content */}
       <div
@@ -56,16 +37,15 @@ const TestimonialSection = () => {
           A place that grows in value while giving peace today.
         </p>
 
-    <Carousel3D/>
+       <Carousel3D/>
 
-       <a   href="#"
+       <a href="#"
           className="text-white/80 hover:text-white transition-colors"
           style={{
             fontSize: "clamp(0.85rem, 1vw, 1rem)",
             letterSpacing: "0.1em",
             textDecoration: "underline",
             textUnderlineOffset: "5px",
-            fontFamily: "'Georgia', serif",
           }}
         >
           View All

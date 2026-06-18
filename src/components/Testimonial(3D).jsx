@@ -14,7 +14,7 @@ const N = DATA.length;
 const halfAngleRad = Math.PI / N;
 
 // Desktop values — untouched
-const W_PX = 600;
+const W_PX = 700;
 const GAP_PX = 30;
 const Z_PX = -1 * (W_PX / 2 + GAP_PX) / Math.tan(halfAngleRad);
 
@@ -23,24 +23,35 @@ const MW_PX = 260;
 const MGAP_PX = 12;
 const MZ_PX = -1 * (MW_PX / 2 + MGAP_PX) / Math.tan(halfAngleRad);
 
-function isMobileNow() {
-  return typeof window !== "undefined" && window.innerWidth < 640;
+function getScreenType() {
+  if (typeof window === "undefined") return "desktop";
+
+  if (window.innerWidth < 640) return "mobile";
+  if (window.innerWidth < 1024) return "laptop";
+
+  return "desktop";
 }
 
 export default function Carousel3D() {
   const [paused, setPaused] = useState(false);
-  const [mobile, setMobile] = useState(isMobileNow);
+  const [screenType, setScreenType] = useState(getScreenType);
 
   useEffect(() => {
-    const onResize = () => setMobile(isMobileNow());
+    const onResize = () => setScreenType(getScreenType());
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const cardW  = mobile ? MW_PX  : W_PX;
-  const cardH  = mobile ? 190    : 400;
-  const zVal   = mobile ? MZ_PX  : Z_PX;
-  const persp  = mobile ? 600    : 1100;
+  const mobile = screenType === "mobile";
+  const laptop = screenType === "laptop";
+
+  const cardW = mobile ? MW_PX : W_PX;
+  const zVal = mobile ? MZ_PX : Z_PX;
+  const persp = mobile ? 600 : 1000;
+
+  // ONLY HEIGHTS CHANGED
+  const cardH = mobile ? 190 : laptop ? 300 : 400;
+  const sceneHeight = mobile ? "35vh" : laptop ? "50vh" : "70vh";
 
   return (
     <>
@@ -48,7 +59,7 @@ export default function Carousel3D() {
         .c3d-scene {
           display: grid;
           width: 100%;
-          height: ${mobile ? "35vh" : "70vh"};
+          height: ${sceneHeight};
           overflow: hidden;
           perspective: ${persp}px;
           cursor: pointer;
@@ -88,7 +99,9 @@ export default function Carousel3D() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .c3d-a3d { animation-duration: 80s; }
+          .c3d-a3d {
+            animation-duration: 80s;
+          }
         }
       `}</style>
 
@@ -100,6 +113,7 @@ export default function Carousel3D() {
         <div className="c3d-a3d">
           {DATA.map((code, i) => {
             const angleDeg = (360 / N) * i;
+
             return (
               <div
                 key={code}
