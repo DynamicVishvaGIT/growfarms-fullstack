@@ -12,8 +12,8 @@
   body,
   #root {
     width: 100%;
-    max-width: 100%;
-    overflow-x: hidden;
+    /* max-width: 100%; */
+    /* overflow-x: hidden; */
   }
 }
 
@@ -35,3 +35,12 @@
 * {
   -ms-overflow-style: none;
 }
+/* 
+@keyframes scrollTextIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.scroll-text-in {
+  animation: scrollTextIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+} */
