@@ -69,7 +69,6 @@ const HomeBanner = () => {
   const progressRef  = useRef(0);
   const lerpRef      = useRef(0);
   const lerpRafRef   = useRef(null);
-  const scrollHintRef = useRef(null);
 
   const textStageRefs = useRef(TEXT_STAGES.map(() => ({
     wrap   : null,
@@ -86,12 +85,24 @@ const HomeBanner = () => {
   // ── vh fix ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const set = () => {
-      document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
+      // Use visualViewport if available for accurate mobile height
+      const vh = (window.visualViewport?.height ?? window.innerHeight) * 0.01;
+      document.documentElement.style.setProperty("--vh", `${vh}px`);
       setPinHeight(getPinHeight());
     };
     set();
+
+    window.visualViewport?.addEventListener("resize", set);
     window.addEventListener("resize", set, { passive: true });
-    return () => window.removeEventListener("resize", set);
+    window.addEventListener("orientationchange", () => {
+      // Small delay to let browser finish toolbar resize
+      setTimeout(set, 300);
+    });
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", set);
+      window.removeEventListener("resize", set);
+    };
   }, []);
 
   // ── drawFrame ────────────────────────────────────────────────────────────────
@@ -191,10 +202,10 @@ const HomeBanner = () => {
       const refs   = textStageRefs.current[i];
       if (!refs.wrap) return;
 
-      const isFirst = i === 1;
+      const isFirst = i === 0;
       const isLast  = i === TEXT_STAGES.length - 1;
       const start   = i * SEGMENT;
-      const local   = (p - start) / SEGMENT; // 0..1 within this stage
+      const local   = (p - start) / SEGMENT;
 
       let opacity = 0;
       let yH1     = 32;
@@ -202,29 +213,23 @@ const HomeBanner = () => {
       let yP      = 44;
 
       if (p < start) {
-        // Stage hasn't started yet — hidden below
         opacity = 0; yH1 = 32; yEye = 20; yP = 44;
       } else if (isFirst && p < SEGMENT * ENTER_FRAC) {
-        // Stage 0: animate in on initial load (progress 0 → ENTER_FRAC*SEGMENT)
         const t = easeOut3(p / (SEGMENT * ENTER_FRAC));
         opacity = t;
         yH1     = 32 * (1 - t);
         yEye    = 20 * (1 - t);
         yP      = 44 * (1 - t);
       } else if (local <= ENTER_FRAC && !isFirst) {
-        // Non-first stages: animate in
         const t = easeOut3(local / ENTER_FRAC);
         opacity = t; yH1 = 32 * (1 - t); yEye = 20 * (1 - t); yP = 44 * (1 - t);
       } else if (isLast) {
-        // Last stage: lock visible forever
         opacity = 1; yH1 = 0; yEye = 0; yP = 0;
         currentActive = i;
       } else if (local <= EXIT_FRAC) {
-        // Hold fully visible
         opacity = 1; yH1 = 0; yEye = 0; yP = 0;
         currentActive = i;
       } else {
-        // Exit: slide up + fade out
         const exitT = easeIn3(clamp((local - EXIT_FRAC) / (1 - EXIT_FRAC)));
         opacity = 1 - exitT;
         yH1     = -22 * exitT;
@@ -280,6 +285,16 @@ const HomeBanner = () => {
   useEffect(() => {
     if (!ready) return;
 
+    // ── MOBILE PIN FIX: remove overflow:hidden from html/body ──
+    // overflow:hidden on any ancestor breaks ScrollTrigger pin on mobile
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    // Only override if they are set to hidden
+    if (getComputedStyle(html).overflow === "hidden") html.style.overflow = "clip";
+    if (getComputedStyle(body).overflow === "hidden") body.style.overflow = "clip";
+
     // Init clouds
     [cloudLMobRef, cloudLDeskRef].forEach(({ current: el }) => {
       if (!el) return;
@@ -294,7 +309,7 @@ const HomeBanner = () => {
       el.style.willChange = "transform, opacity";
     });
 
-    // Init text stages — stage 0 visible, rest hidden
+    // Init text stages
     textStageRefs.current.forEach((refs, i) => {
       if (!refs.wrap) return;
       refs.wrap.style.willChange = "opacity";
@@ -310,24 +325,32 @@ const HomeBanner = () => {
 
     if (triggerRef.current) { triggerRef.current.kill(); triggerRef.current = null; }
 
-    triggerRef.current = ScrollTrigger.create({
-      trigger      : pinWrapRef.current,
-      start        : "top top",
-      end          : "bottom bottom",
-      pin          : stickyRef.current,
-      anticipatePin: 1,
-      pinSpacing   : false,
-      onUpdate(self) {
-        progressRef.current = self.progress;
-        startLerp();
-      },
-    });
+    // Small delay so layout is stable before ScrollTrigger measures
+    const initTimer = setTimeout(() => {
+      triggerRef.current = ScrollTrigger.create({
+        trigger            : pinWrapRef.current,
+        start              : "top top",
+        end                : "bottom bottom",
+        pin                : stickyRef.current,
+        anticipatePin      : 1,
+        pinSpacing         : false,
+        invalidateOnRefresh: true,   // ← recalculate on resize/refresh
+        onUpdate(self) {
+          progressRef.current = self.progress;
+          startLerp();
+        },
+      });
 
-    ScrollTrigger.refresh();
+      ScrollTrigger.refresh();
+    }, 100);
 
     return () => {
+      clearTimeout(initTimer);
       if (triggerRef.current) { triggerRef.current.kill(); triggerRef.current = null; }
       if (lerpRafRef.current) cancelAnimationFrame(lerpRafRef.current);
+      // Restore overflow
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
     };
   }, [ready, startLerp]);
 
@@ -339,18 +362,25 @@ const HomeBanner = () => {
   return (
     <>
       <style>{`
+        /* ── Global mobile pin fix ── */
+        /* If your App/index wrapper has overflow:hidden, change it to overflow:clip */
+        html, body {
+          /* Do NOT set overflow:hidden here — use clip if needed */
+          overscroll-behavior: none;
+        }
+
         /* ── Heading ── */
         .hb-heading {
           font-size: clamp(2rem, 5vw, 3.25rem);
           font-weight: 300;
-          width: 100%;                    /* FIX: fill container width */
-          max-width: 18ch;                /* FIX: tighter ch so it wraps nicely at 2 lines */
+          width: 100%;
+          max-width: 18ch;
           line-height: 1.08;
           letter-spacing: -0.02em;
           color: #ffffff;
           white-space: pre-line;
           text-shadow: 0 4px 32px rgba(0,0,0,0.4);
-          margin: 0 auto 1.25rem;        /* FIX: auto horizontal to keep centered */
+          margin: 0 auto 1.25rem;
         }
 
         /* ── Eyebrow ── */
@@ -363,7 +393,7 @@ const HomeBanner = () => {
           margin: 0 auto 1rem;
           display: block;
           width: 100%;
-          max-width: 18ch;               /* aligned with heading */
+          max-width: 18ch;
           text-shadow: 0 1px 8px rgba(0,0,0,0.3);
         }
 
@@ -374,7 +404,7 @@ const HomeBanner = () => {
           line-height: 1.7;
           color: rgba(255, 255, 255, 0.68);
           width: 100%;
-          max-width: 38ch;               /* slightly wider than heading is fine */
+          max-width: 38ch;
           margin: 0 auto;
           text-shadow: 0 1px 12px rgba(0,0,0,0.3);
         }
@@ -391,25 +421,50 @@ const HomeBanner = () => {
           background: #a3c96e;
           transform: scale(1.4);
         }
-
       `}</style>
 
+      {/*
+        ── PIN WRAPPER ──
+        • position: relative is required for ScrollTrigger pin to work
+        • overflow: visible (NOT hidden) so the sticky child can escape
+        • NO transform on this element (breaks stacking context for pin)
+      */}
       <div
         ref={pinWrapRef}
-        className="overflow-visible"
-        style={{ height: pinHeight, position: "relative", zIndex: 30 }}
+        style={{
+          height  : pinHeight,
+          position: "relative",
+          zIndex  : 30,
+          overflow: "visible",   // ← critical: NOT hidden
+        }}
       >
+        {/*
+          ── STICKY PANEL ──
+          • position: relative (ScrollTrigger will toggle it to fixed while pinned)
+          • overflow: visible so clouds can bleed outside
+          • willChange + backfaceVisibility → smoother compositing on mobile
+        */}
         <div
           ref={stickyRef}
-          className="relative w-full"
-          style={{ height: "calc(var(--vh, 1vh) * 100)", overflow: "visible" }}
+          style={{
+            position          : "relative",
+            width             : "100%",
+            height            : "calc(var(--vh, 1vh) * 100)",
+            overflow          : "visible",          // ← critical: NOT hidden
+            willChange        : "transform",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+          }}
         >
 
           {/* Canvas */}
           <canvas
             ref={canvasRef}
-            className="absolute inset-0 w-full h-full"
             style={{
+              position      : "absolute",
+              inset         : 0,
+              width         : "100%",
+              height        : "100%",
               opacity       : ready ? 1 : 0,
               transition    : "opacity 0.4s ease",
               imageRendering: "crisp-edges",
@@ -418,10 +473,15 @@ const HomeBanner = () => {
 
           {/* Bottom gradient */}
           <div
-            className="absolute bottom-0 left-0 w-full pointer-events-none"
             style={{
-              height: "30%", zIndex: 10,
-              background: `linear-gradient(to top,
+              position      : "absolute",
+              bottom        : 0,
+              left          : 0,
+              width         : "100%",
+              height        : "30%",
+              zIndex        : 10,
+              pointerEvents : "none",
+              background    : `linear-gradient(to top,
                 rgba(14,42,20,0.98) 0%,
                 rgba(22,63,31,0.80) 30%,
                 rgba(22,63,31,0.35) 60%,
@@ -431,24 +491,50 @@ const HomeBanner = () => {
 
           {/* Top vignette */}
           <div
-            className="absolute top-0 left-0 w-full pointer-events-none"
             style={{
-              height: "22%", zIndex: 10,
-              background: "linear-gradient(to bottom, rgba(14,42,20,0.5) 0%, transparent 100%)",
+              position    : "absolute",
+              top         : 0,
+              left        : 0,
+              width       : "100%",
+              height      : "22%",
+              zIndex      : 10,
+              pointerEvents: "none",
+              background  : "linear-gradient(to bottom, rgba(14,42,20,0.5) 0%, transparent 100%)",
             }}
           />
 
           {/* Logo */}
-          <div className="absolute top-0 left-0 right-0 z-30 flex justify-center pt-8 md:pt-10 px-6">
+          <div
+            style={{
+              position      : "absolute",
+              top           : 0,
+              left          : 0,
+              right         : 0,
+              zIndex        : 30,
+              display       : "flex",
+              justifyContent: "center",
+              paddingTop    : "clamp(1.5rem, 4vw, 2.5rem)",
+              paddingLeft   : "1.5rem",
+              paddingRight  : "1.5rem",
+            }}
+          >
             <img
               src={logo_img}
               alt="GrowFarms – Live with Nature"
-              className="h-12 md:h-14 lg:h-16 w-auto object-contain"
+              style={{ height: "clamp(3rem, 6vw, 4rem)", width: "auto", objectFit: "contain" }}
             />
           </div>
 
           {/* ── Hero text stages ── */}
-          <div className="absolute inset-0 z-20 pointer-events-none select-none">
+          <div
+            style={{
+              position    : "absolute",
+              inset       : 0,
+              zIndex      : 20,
+              pointerEvents: "none",
+              userSelect  : "none",
+            }}
+          >
             {TEXT_STAGES.map((stage, i) => {
               const isFirst = i === 0;
               return (
@@ -457,17 +543,24 @@ const HomeBanner = () => {
                   ref={(el) => {
                     if (!textStageRefs.current[i]) return;
                     textStageRefs.current[i].wrap = el;
-                    // ── Stamp initial styles immediately on DOM attach ──
-                    // so text is never invisible before the ScrollTrigger effect runs
                     if (el) {
                       el.style.opacity    = isFirst ? "1" : "0";
                       el.style.willChange = "opacity";
                     }
                   }}
-                  className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 sm:px-10"
-                  style={{ paddingBottom: "5rem" }}
+                  style={{
+                    position      : "absolute",
+                    inset         : 0,
+                    display       : "flex",
+                    flexDirection : "column",
+                    alignItems    : "center",
+                    justifyContent: "center",
+                    textAlign     : "center",
+                    paddingLeft   : "1.5rem",
+                    paddingRight  : "1.5rem",
+                    paddingBottom : "5rem",
+                  }}
                 >
-
                   {/* Eyebrow */}
                   <span
                     ref={(el) => {
@@ -519,37 +612,93 @@ const HomeBanner = () => {
 
           {/* ── Stage progress dots ── */}
           <div
-            className="absolute z-30 flex flex-col gap-2 items-center"
-            style={{ right: "1.5rem", top: "50%", transform: "translateY(-50%)" }}
+            style={{
+              position : "absolute",
+              right    : "0.75rem",   // slightly tighter on mobile
+              top      : "50%",
+              transform: "translateY(-50%)",
+              zIndex   : 30,
+              display  : "flex",
+              flexDirection: "column",
+              gap      : "0.5rem",
+              alignItems: "center",
+            }}
           >
             {TEXT_STAGES.map((_, i) => (
               <div key={i} className={`hb-dot${activeIdx === i ? " active" : ""}`} />
             ))}
           </div>
 
-
           {/* Left cloud — mobile */}
-          <div ref={cloudLMobRef} className="absolute pointer-events-none md:hidden"
-            style={{ bottom: "-5%", left: "-10%", width: "280px", zIndex: 40, opacity: 0, transform: "translateX(-130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" style={{ transform: "scaleX(-1)" }} />
+          <div
+            ref={cloudLMobRef}
+            className="md:hidden"
+            style={{
+              position     : "absolute",
+              bottom       : "-5%",
+              left         : "-10%",
+              width        : "280px",
+              zIndex       : 40,
+              opacity      : 0,
+              transform    : "translateX(-130%)",
+              pointerEvents: "none",
+            }}
+          >
+            <img src={cloude_1} alt="" style={{ width: "100%", height: "auto", objectFit: "contain", transform: "scaleX(-1)" }} />
           </div>
 
           {/* Left cloud — desktop */}
-          <div ref={cloudLDeskRef} className="absolute pointer-events-none hidden md:block"
-            style={{ bottom: "-28%", left: "-40%", width: "clamp(700px,100vw,1800px)", zIndex: 40, opacity: 0, transform: "translateX(-130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" style={{ transform: "scaleX(-1)" }} />
+          <div
+            ref={cloudLDeskRef}
+            className="hidden md:block"
+            style={{
+              position     : "absolute",
+              bottom       : "-28%",
+              left         : "-40%",
+              width        : "clamp(700px,100vw,1800px)",
+              zIndex       : 40,
+              opacity      : 0,
+              transform    : "translateX(-130%)",
+              pointerEvents: "none",
+            }}
+          >
+            <img src={cloude_1} alt="" style={{ width: "100%", height: "auto", objectFit: "contain", transform: "scaleX(-1)" }} />
           </div>
 
           {/* Right cloud — mobile */}
-          <div ref={cloudRMobRef} className="absolute pointer-events-none md:hidden"
-            style={{ bottom: "-5%", right: "-10%", width: "280px", zIndex: 40, opacity: 0, transform: "translateX(130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" />
+          <div
+            ref={cloudRMobRef}
+            className="md:hidden"
+            style={{
+              position     : "absolute",
+              bottom       : "-5%",
+              right        : "-10%",
+              width        : "280px",
+              zIndex       : 40,
+              opacity      : 0,
+              transform    : "translateX(130%)",
+              pointerEvents: "none",
+            }}
+          >
+            <img src={cloude_1} alt="" style={{ width: "100%", height: "auto", objectFit: "contain" }} />
           </div>
 
           {/* Right cloud — desktop */}
-          <div ref={cloudRDeskRef} className="absolute pointer-events-none hidden md:block"
-            style={{ bottom: "-28%", right: "-40%", width: "clamp(700px,100vw,1800px)", zIndex: 40, opacity: 0, transform: "translateX(130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" />
+          <div
+            ref={cloudRDeskRef}
+            className="hidden md:block"
+            style={{
+              position     : "absolute",
+              bottom       : "-28%",
+              right        : "-40%",
+              width        : "clamp(700px,100vw,1800px)",
+              zIndex       : 40,
+              opacity      : 0,
+              transform    : "translateX(130%)",
+              pointerEvents: "none",
+            }}
+          >
+            <img src={cloude_1} alt="" style={{ width: "100%", height: "auto", objectFit: "contain" }} />
           </div>
 
         </div>
