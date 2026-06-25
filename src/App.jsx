@@ -1,6 +1,6 @@
 import { useState } from "react";
 import ExploreButton from "./components/ExploreButton";
-import PageLoader from "./components/PageLoader";
+// import PageLoader from "./components/PageLoader";
 import useSmoothScroll from "./hooks/useSmoothScroll";
 import Home from "./pages/Home";
 
@@ -12,20 +12,8 @@ const App = () => {
 
   return (
     <>
-      {/* ── Loader: shown first, disappears after duration ── */}
-      <PageLoader
-        loading={loading}
-        onDone={() => setLoading(false)}
-        duration={2800}
-      />
-
-      {/* ── Main site: renders after loader exits ── */}
-      {!loading && (
-        <>
           <ExploreButton />
           <Home />
-        </>
-      )}
     </>
   );
 };
