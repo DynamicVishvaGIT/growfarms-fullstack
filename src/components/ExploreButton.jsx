@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import logo from "../assets/images/logo_1.png";
+import logo from "/logo_1.png";
 
 const ExploreButton = () => {
   const [navOpen, setNavOpen] = useState(false);

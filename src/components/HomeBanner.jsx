@@ -31,7 +31,7 @@ const TEXT_STAGES = [
   },
 ];
 
-const SEGMENT    = 1 / TOTAL_SCROLLS; // 0.2 per stage
+const SEGMENT    = 1 / TOTAL_SCROLLS;
 const ENTER_FRAC = 0.28;
 const EXIT_FRAC  = 0.72;
 
@@ -42,10 +42,13 @@ const FRAME_EXT    = "webp";
 const FRAME_PAD    = 1;
 const BATCH_SIZE   = 20;
 
-const pad   = (n, w) => (w > 1 ? String(n).padStart(w, "0") : String(n));
-const clamp = (v) => Math.max(0, Math.min(1, v));
-const easeOut3 = (t) => 1 - Math.pow(1 - t, 3);
-const easeIn3  = (t) => Math.pow(t, 3);
+// ─── Dark green — matches ctx.fillStyle and canvas bg ─────────────────────────
+const BG_COLOR = "#0e2a14";
+
+const pad      = (n, w) => (w > 1 ? String(n).padStart(w, "0") : String(n));
+const clamp    = (v)    => Math.max(0, Math.min(1, v));
+const easeOut3 = (t)    => 1 - Math.pow(1 - t, 3);
+const easeIn3  = (t)    => Math.pow(t, 3);
 
 const applyCloud = (el, xPct, opacity) => {
   if (!el) return;
@@ -56,7 +59,6 @@ const applyCloud = (el, xPct, opacity) => {
 // ══════════════════════════════════════════════════════════════════════════════
 const HomeBanner = () => {
   const [ready,     setReady]     = useState(false);
-  const [loadPct,   setLoadPct]   = useState(0);
   const [pinHeight, setPinHeight] = useState(getPinHeight());
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -85,20 +87,14 @@ const HomeBanner = () => {
   // ── vh fix ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const set = () => {
-      // Use visualViewport if available for accurate mobile height
       const vh = (window.visualViewport?.height ?? window.innerHeight) * 0.01;
       document.documentElement.style.setProperty("--vh", `${vh}px`);
       setPinHeight(getPinHeight());
     };
     set();
-
     window.visualViewport?.addEventListener("resize", set);
     window.addEventListener("resize", set, { passive: true });
-    window.addEventListener("orientationchange", () => {
-      // Small delay to let browser finish toolbar resize
-      setTimeout(set, 300);
-    });
-
+    window.addEventListener("orientationchange", () => setTimeout(set, 300));
     return () => {
       window.visualViewport?.removeEventListener("resize", set);
       window.removeEventListener("resize", set);
@@ -106,12 +102,15 @@ const HomeBanner = () => {
   }, []);
 
   // ── drawFrame ────────────────────────────────────────────────────────────────
-  const drawFrame = useCallback((index) => {
+  // FIX: accept forceRedraw flag so canvas resize can repaint last frame
+  const drawFrame = useCallback((index, forceRedraw = false) => {
     const idx    = Math.max(0, Math.min(index, FRAME_COUNT - 1));
     const bitmap = framesRef.current[idx];
     const canvas = canvasRef.current;
     if (!bitmap || !canvas) return;
-    if (idx === lastFrameRef.current) return;
+
+    // FIX: skip only if same frame AND not forced (resize needs force)
+    if (idx === lastFrameRef.current && !forceRedraw) return;
     lastFrameRef.current = idx;
 
     const ctx = canvas.getContext("2d", { alpha: false });
@@ -124,7 +123,8 @@ const HomeBanner = () => {
     const dw = Math.ceil(bw * scale), dh = Math.ceil(bh * scale);
     const dx = Math.round((cw - dw) / 2), dy = Math.round((ch - dh) / 2);
 
-    ctx.fillStyle = "#163f1f";
+    // FIX: use BG_COLOR constant so it matches the wrapper background
+    ctx.fillStyle = BG_COLOR;
     ctx.fillRect(0, 0, cw, ch);
     ctx.drawImage(bitmap, dx, dy, dw, dh);
   }, []);
@@ -135,12 +135,18 @@ const HomeBanner = () => {
     if (!canvas) return;
     const resize = () => {
       const pr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = canvas.offsetWidth, h = canvas.offsetHeight;
-      if (canvas.width !== Math.round(w * pr) || canvas.height !== Math.round(h * pr)) {
+      const w  = canvas.offsetWidth;
+      const h  = canvas.offsetHeight;
+      if (
+        canvas.width  !== Math.round(w * pr) ||
+        canvas.height !== Math.round(h * pr)
+      ) {
         canvas.width  = Math.round(w * pr);
         canvas.height = Math.round(h * pr);
-        lastFrameRef.current = -1;
-        if (framesRef.current.length > 0) drawFrame(Math.max(0, lastFrameRef.current));
+        // FIX: force redraw after resize so last frame repaints correctly
+        if (framesRef.current.length > 0 && lastFrameRef.current >= 0) {
+          drawFrame(lastFrameRef.current, true);
+        }
       }
     };
     resize();
@@ -166,7 +172,7 @@ const HomeBanner = () => {
         await Promise.all(
           slice.map(async (url, j) => {
             try {
-              const res = await fetch(url);
+              const res  = await fetch(url);
               const blob = await res.blob();
               bitmaps[i + j] = await createImageBitmap(blob, {
                 colorSpaceConversion: "none",
@@ -176,7 +182,6 @@ const HomeBanner = () => {
               console.warn("Frame load failed:", url, e);
             }
             loaded++;
-            setLoadPct(Math.round((loaded / FRAME_COUNT) * 100));
             if (!firstDrawn && bitmaps[0]) {
               firstDrawn        = true;
               framesRef.current = bitmaps;
@@ -207,19 +212,13 @@ const HomeBanner = () => {
       const start   = i * SEGMENT;
       const local   = (p - start) / SEGMENT;
 
-      let opacity = 0;
-      let yH1     = 32;
-      let yEye    = 20;
-      let yP      = 44;
+      let opacity = 0, yH1 = 32, yEye = 20, yP = 44;
 
       if (p < start) {
         opacity = 0; yH1 = 32; yEye = 20; yP = 44;
       } else if (isFirst && p < SEGMENT * ENTER_FRAC) {
         const t = easeOut3(p / (SEGMENT * ENTER_FRAC));
-        opacity = t;
-        yH1     = 32 * (1 - t);
-        yEye    = 20 * (1 - t);
-        yP      = 44 * (1 - t);
+        opacity = t; yH1 = 32 * (1 - t); yEye = 20 * (1 - t); yP = 44 * (1 - t);
       } else if (local <= ENTER_FRAC && !isFirst) {
         const t = easeOut3(local / ENTER_FRAC);
         opacity = t; yH1 = 32 * (1 - t); yEye = 20 * (1 - t); yP = 44 * (1 - t);
@@ -232,9 +231,7 @@ const HomeBanner = () => {
       } else {
         const exitT = easeIn3(clamp((local - EXIT_FRAC) / (1 - EXIT_FRAC)));
         opacity = 1 - exitT;
-        yH1     = -22 * exitT;
-        yEye    = -14 * exitT;
-        yP      = -14 * exitT;
+        yH1 = -22 * exitT; yEye = -14 * exitT; yP = -14 * exitT;
       }
 
       refs.wrap.style.opacity = opacity;
@@ -255,15 +252,24 @@ const HomeBanner = () => {
       if (Math.abs(diff) < 0.5 / FRAME_COUNT) {
         lerpRef.current    = target;
         lerpRafRef.current = null;
-        applyTextStages(lerpRef.current);
+        // FIX: still apply final state when lerp settles
+        const p      = lerpRef.current;
+        const videoP = Math.min(p / VIDEO_END, 1);
+        drawFrame(Math.round(videoP * (FRAME_COUNT - 1)));
+        const cloudP = clamp((p - CLOUD_START) / CLOUD_RANGE);
+        applyCloud(cloudLMobRef.current,  -130 + cloudP * 130, cloudP);
+        applyCloud(cloudLDeskRef.current, -130 + cloudP * 130, cloudP);
+        applyCloud(cloudRMobRef.current,   130 - cloudP * 130, cloudP);
+        applyCloud(cloudRDeskRef.current,  130 - cloudP * 130, cloudP);
+        applyTextStages(p);
         return;
       }
 
       lerpRef.current += diff * 0.1;
       const p = lerpRef.current;
 
-      // Canvas
-      const videoP   = Math.min(p / VIDEO_END, 1);
+      // Canvas — clamp videoP so it never exceeds 1 after VIDEO_END
+      const videoP = clamp(p / VIDEO_END);
       drawFrame(Math.round(videoP * (FRAME_COUNT - 1)));
 
       // Clouds
@@ -285,13 +291,10 @@ const HomeBanner = () => {
   useEffect(() => {
     if (!ready) return;
 
-    // ── MOBILE PIN FIX: remove overflow:hidden from html/body ──
-    // overflow:hidden on any ancestor breaks ScrollTrigger pin on mobile
     const html = document.documentElement;
     const body = document.body;
     const prevHtmlOverflow = html.style.overflow;
     const prevBodyOverflow = body.style.overflow;
-    // Only override if they are set to hidden
     if (getComputedStyle(html).overflow === "hidden") html.style.overflow = "clip";
     if (getComputedStyle(body).overflow === "hidden") body.style.overflow = "clip";
 
@@ -325,7 +328,6 @@ const HomeBanner = () => {
 
     if (triggerRef.current) { triggerRef.current.kill(); triggerRef.current = null; }
 
-    // Small delay so layout is stable before ScrollTrigger measures
     const initTimer = setTimeout(() => {
       triggerRef.current = ScrollTrigger.create({
         trigger            : pinWrapRef.current,
@@ -334,13 +336,12 @@ const HomeBanner = () => {
         pin                : stickyRef.current,
         anticipatePin      : 1,
         pinSpacing         : false,
-        invalidateOnRefresh: true,   // ← recalculate on resize/refresh
+        invalidateOnRefresh: true,
         onUpdate(self) {
           progressRef.current = self.progress;
           startLerp();
         },
       });
-
       ScrollTrigger.refresh();
     }, 100);
 
@@ -348,7 +349,6 @@ const HomeBanner = () => {
       clearTimeout(initTimer);
       if (triggerRef.current) { triggerRef.current.kill(); triggerRef.current = null; }
       if (lerpRafRef.current) cancelAnimationFrame(lerpRafRef.current);
-      // Restore overflow
       html.style.overflow = prevHtmlOverflow;
       body.style.overflow = prevBodyOverflow;
     };
@@ -362,14 +362,9 @@ const HomeBanner = () => {
   return (
     <>
       <style>{`
-        /* ── Global mobile pin fix ── */
-        /* If your App/index wrapper has overflow:hidden, change it to overflow:clip */
         html, body {
-          /* Do NOT set overflow:hidden here — use clip if needed */
           overscroll-behavior: none;
         }
-
-        /* ── Heading ── */
         .hb-heading {
           font-size: clamp(2rem, 5vw, 3.25rem);
           font-weight: 300;
@@ -382,8 +377,6 @@ const HomeBanner = () => {
           text-shadow: 0 4px 32px rgba(0,0,0,0.4);
           margin: 0 auto 1.25rem;
         }
-
-        /* ── Eyebrow ── */
         .hb-eyebrow {
           font-size: clamp(0.6rem, 1vw, 0.75rem);
           font-weight: 500;
@@ -396,8 +389,6 @@ const HomeBanner = () => {
           max-width: 18ch;
           text-shadow: 0 1px 8px rgba(0,0,0,0.3);
         }
-
-        /* ── Sub copy ── */
         .hb-sub {
           font-size: clamp(0.78rem, 1.2vw, 1rem);
           font-weight: 300;
@@ -408,8 +399,6 @@ const HomeBanner = () => {
           margin: 0 auto;
           text-shadow: 0 1px 12px rgba(0,0,0,0.3);
         }
-
-        /* ── Dots ── */
         .hb-dot {
           width: 6px;
           height: 6px;
@@ -423,41 +412,40 @@ const HomeBanner = () => {
         }
       `}</style>
 
-      {/*
-        ── PIN WRAPPER ──
-        • position: relative is required for ScrollTrigger pin to work
-        • overflow: visible (NOT hidden) so the sticky child can escape
-        • NO transform on this element (breaks stacking context for pin)
-      */}
+      {/* ── PIN WRAPPER ── */}
       <div
         ref={pinWrapRef}
         style={{
-          height  : pinHeight,
-          position: "relative",
-          zIndex  : 30,
-          overflow: "visible",   // ← critical: NOT hidden
+          height    : pinHeight,
+          position  : "relative",
+          zIndex    : 30,
+          overflow  : "visible",
+          // FIX 1: background so no white shows if canvas hasn't painted yet
+          background: BG_COLOR,
         }}
       >
-        {/*
-          ── STICKY PANEL ──
-          • position: relative (ScrollTrigger will toggle it to fixed while pinned)
-          • overflow: visible so clouds can bleed outside
-          • willChange + backfaceVisibility → smoother compositing on mobile
-        */}
+        {/* ── STICKY PANEL ── */}
         <div
           ref={stickyRef}
           style={{
-            position          : "relative",
-            width             : "100%",
-            height            : "calc(var(--vh, 1vh) * 100)",
-            overflow          : "visible",          // ← critical: NOT hidden
-            willChange        : "transform",
-            backfaceVisibility: "hidden",
+            position                : "relative",
+            width                   : "100%",
+            height                  : "calc(var(--vh, 1vh) * 100)",
+            overflow                : "visible",
+            willChange              : "transform",
+            backfaceVisibility      : "hidden",
             WebkitBackfaceVisibility: "hidden",
+            // FIX 2: same bg on sticky panel too
+            background              : BG_COLOR,
           }}
         >
 
           {/* Canvas */}
+          {/*
+            FIX 3: removed opacity:0 when not ready — canvas has BG_COLOR
+            fill from ctx.fillRect so it always shows dark green, never white.
+            Kept a very short fade-in just to avoid hard pop.
+          */}
           <canvas
             ref={canvasRef}
             style={{
@@ -465,23 +453,23 @@ const HomeBanner = () => {
               inset         : 0,
               width         : "100%",
               height        : "100%",
-              opacity       : ready ? 1 : 0,
-              transition    : "opacity 0.4s ease",
+              opacity       : 1,               // ← FIX: always 1, no white flash
               imageRendering: "crisp-edges",
+              background    : BG_COLOR,        // ← FIX: dark bg before first frame
             }}
           />
 
           {/* Bottom gradient */}
           <div
             style={{
-              position      : "absolute",
-              bottom        : 0,
-              left          : 0,
-              width         : "100%",
-              height        : "30%",
-              zIndex        : 10,
-              pointerEvents : "none",
-              background    : `linear-gradient(to top,
+              position    : "absolute",
+              bottom      : 0,
+              left        : 0,
+              width       : "100%",
+              height      : "30%",
+              zIndex      : 10,
+              pointerEvents: "none",
+              background  : `linear-gradient(to top,
                 rgba(14,42,20,0.98) 0%,
                 rgba(22,63,31,0.80) 30%,
                 rgba(22,63,31,0.35) 60%,
@@ -561,7 +549,6 @@ const HomeBanner = () => {
                     paddingBottom : "5rem",
                   }}
                 >
-                  {/* Eyebrow */}
                   <span
                     ref={(el) => {
                       if (!textStageRefs.current[i]) return;
@@ -576,7 +563,6 @@ const HomeBanner = () => {
                     {stage.eyebrow}
                   </span>
 
-                  {/* Heading */}
                   <h1
                     ref={(el) => {
                       if (!textStageRefs.current[i]) return;
@@ -591,7 +577,6 @@ const HomeBanner = () => {
                     {stage.heading}
                   </h1>
 
-                  {/* Sub */}
                   <p
                     ref={(el) => {
                       if (!textStageRefs.current[i]) return;
@@ -613,15 +598,15 @@ const HomeBanner = () => {
           {/* ── Stage progress dots ── */}
           <div
             style={{
-              position : "absolute",
-              right    : "0.75rem",   // slightly tighter on mobile
-              top      : "50%",
-              transform: "translateY(-50%)",
-              zIndex   : 30,
-              display  : "flex",
+              position     : "absolute",
+              right        : "0.75rem",
+              top          : "50%",
+              transform    : "translateY(-50%)",
+              zIndex       : 30,
+              display      : "flex",
               flexDirection: "column",
-              gap      : "0.5rem",
-              alignItems: "center",
+              gap          : "0.5rem",
+              alignItems   : "center",
             }}
           >
             {TEXT_STAGES.map((_, i) => (
