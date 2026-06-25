@@ -72,6 +72,14 @@ const HomeBanner = () => {
   const lerpRef      = useRef(0);
   const lerpRafRef   = useRef(null);
 
+  // ─── FIX 1: offscreen buffer holds the composited last frame ───────────────
+  // When video ends (p >= VIDEO_END), we blit INTO this buffer once and
+  // thereafter always copy FROM it — so canvas resize / re-enter never
+  // re-runs drawFrame with a stale lastFrameRef check that causes black flash.
+  const offscreenRef       = useRef(null);   // OffscreenCanvas (or regular Canvas)
+  const lastVideoFrameRef  = useRef(-1);     // last frame index drawn to offscreen
+  const videoEndLockedRef  = useRef(false);  // true once we've locked the last frame
+
   const textStageRefs = useRef(TEXT_STAGES.map(() => ({
     wrap   : null,
     eyebrow: null,
@@ -101,33 +109,72 @@ const HomeBanner = () => {
     };
   }, []);
 
+  // ─── FIX 2: createOffscreen — build/rebuild offscreen buffer ───────────────
+  // Called once on mount and again on canvas resize so dimensions always match.
+  const createOffscreen = useCallback((w, h) => {
+    try {
+      const oc = new OffscreenCanvas(w, h);
+      offscreenRef.current = oc;
+    } catch (_) {
+      // Fallback for browsers without OffscreenCanvas (rare)
+      const oc = document.createElement("canvas");
+      oc.width  = w;
+      oc.height = h;
+      offscreenRef.current = oc;
+    }
+    // Invalidate lock so next drawFrame re-composites into new-size buffer
+    videoEndLockedRef.current = false;
+    lastVideoFrameRef.current = -1;
+  }, []);
+
   // ── drawFrame ────────────────────────────────────────────────────────────────
-  // FIX: accept forceRedraw flag so canvas resize can repaint last frame
+  // FIX 3: two-step render
+  //   a) If idx != lastVideoFrameRef → paint into offscreen buffer
+  //   b) Always blit offscreen → visible canvas (covers resize repaints too)
   const drawFrame = useCallback((index, forceRedraw = false) => {
     const idx    = Math.max(0, Math.min(index, FRAME_COUNT - 1));
     const bitmap = framesRef.current[idx];
     const canvas = canvasRef.current;
     if (!bitmap || !canvas) return;
 
-    // FIX: skip only if same frame AND not forced (resize needs force)
-    if (idx === lastFrameRef.current && !forceRedraw) return;
-    lastFrameRef.current = idx;
-
-    const ctx = canvas.getContext("2d", { alpha: false });
     const { width: cw, height: ch } = canvas;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
 
-    const bw = bitmap.width, bh = bitmap.height;
-    const scale = Math.max(cw / bw, ch / bh);
-    const dw = Math.ceil(bw * scale), dh = Math.ceil(bh * scale);
-    const dx = Math.round((cw - dw) / 2), dy = Math.round((ch - dh) / 2);
+    // Ensure offscreen exists and matches canvas size
+    const oc = offscreenRef.current;
+    if (!oc || oc.width !== cw || oc.height !== ch) {
+      createOffscreen(cw, ch);
+    }
 
-    // FIX: use BG_COLOR constant so it matches the wrapper background
-    ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.drawImage(bitmap, dx, dy, dw, dh);
-  }, []);
+    const offscreen = offscreenRef.current;
+    if (!offscreen) return;
+
+    // ── Repaint offscreen only when frame changes ──
+    if (idx !== lastVideoFrameRef.current || forceRedraw) {
+      lastVideoFrameRef.current = idx;
+
+      const octx = offscreen.getContext("2d", { alpha: false });
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = "high";
+
+      const bw = bitmap.width, bh = bitmap.height;
+      const scale = Math.max(cw / bw, ch / bh);
+      const dw = Math.ceil(bw * scale), dh = Math.ceil(bh * scale);
+      const dx = Math.round((cw - dw) / 2), dy = Math.round((ch - dh) / 2);
+
+      octx.fillStyle = BG_COLOR;
+      octx.fillRect(0, 0, cw, ch);
+      octx.drawImage(bitmap, dx, dy, dw, dh);
+    }
+
+    // ── Always blit offscreen → visible canvas ──
+    // This is the key fix: even if the frame didn't change (e.g. clouds
+    // animating after VIDEO_END, or canvas resized), we still repaint
+    // from the buffer — no black flash, no blank frame.
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.drawImage(offscreen, 0, 0);
+
+    lastFrameRef.current = idx;
+  }, [createOffscreen]);
 
   // ── Resize canvas ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -143,7 +190,11 @@ const HomeBanner = () => {
       ) {
         canvas.width  = Math.round(w * pr);
         canvas.height = Math.round(h * pr);
-        // FIX: force redraw after resize so last frame repaints correctly
+
+        // Offscreen must be recreated at new size
+        createOffscreen(canvas.width, canvas.height);
+
+        // Force repaint from new-size offscreen
         if (framesRef.current.length > 0 && lastFrameRef.current >= 0) {
           drawFrame(lastFrameRef.current, true);
         }
@@ -153,7 +204,7 @@ const HomeBanner = () => {
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, [drawFrame]);
+  }, [drawFrame, createOffscreen]);
 
   // ── Preload frames ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -252,9 +303,9 @@ const HomeBanner = () => {
       if (Math.abs(diff) < 0.5 / FRAME_COUNT) {
         lerpRef.current    = target;
         lerpRafRef.current = null;
-        // FIX: still apply final state when lerp settles
         const p      = lerpRef.current;
-        const videoP = Math.min(p / VIDEO_END, 1);
+        // FIX 4: clamp videoP so after VIDEO_END we always draw last frame
+        const videoP = clamp(p / VIDEO_END);
         drawFrame(Math.round(videoP * (FRAME_COUNT - 1)));
         const cloudP = clamp((p - CLOUD_START) / CLOUD_RANGE);
         applyCloud(cloudLMobRef.current,  -130 + cloudP * 130, cloudP);
@@ -268,18 +319,16 @@ const HomeBanner = () => {
       lerpRef.current += diff * 0.1;
       const p = lerpRef.current;
 
-      // Canvas — clamp videoP so it never exceeds 1 after VIDEO_END
+      // FIX 4: clamp so canvas never goes past last frame
       const videoP = clamp(p / VIDEO_END);
       drawFrame(Math.round(videoP * (FRAME_COUNT - 1)));
 
-      // Clouds
       const cloudP = clamp((p - CLOUD_START) / CLOUD_RANGE);
       applyCloud(cloudLMobRef.current,  -130 + cloudP * 130, cloudP);
       applyCloud(cloudLDeskRef.current, -130 + cloudP * 130, cloudP);
       applyCloud(cloudRMobRef.current,   130 - cloudP * 130, cloudP);
       applyCloud(cloudRDeskRef.current,  130 - cloudP * 130, cloudP);
 
-      // Text
       applyTextStages(p);
 
       lerpRafRef.current = requestAnimationFrame(tick);
@@ -298,7 +347,6 @@ const HomeBanner = () => {
     if (getComputedStyle(html).overflow === "hidden") html.style.overflow = "clip";
     if (getComputedStyle(body).overflow === "hidden") body.style.overflow = "clip";
 
-    // Init clouds
     [cloudLMobRef, cloudLDeskRef].forEach(({ current: el }) => {
       if (!el) return;
       el.style.transform  = "translateX(-130%)";
@@ -312,7 +360,6 @@ const HomeBanner = () => {
       el.style.willChange = "transform, opacity";
     });
 
-    // Init text stages
     textStageRefs.current.forEach((refs, i) => {
       if (!refs.wrap) return;
       refs.wrap.style.willChange = "opacity";
@@ -420,7 +467,6 @@ const HomeBanner = () => {
           position  : "relative",
           zIndex    : 30,
           overflow  : "visible",
-          // FIX 1: background so no white shows if canvas hasn't painted yet
           background: BG_COLOR,
         }}
       >
@@ -435,17 +481,11 @@ const HomeBanner = () => {
             willChange              : "transform",
             backfaceVisibility      : "hidden",
             WebkitBackfaceVisibility: "hidden",
-            // FIX 2: same bg on sticky panel too
             background              : BG_COLOR,
           }}
         >
 
           {/* Canvas */}
-          {/*
-            FIX 3: removed opacity:0 when not ready — canvas has BG_COLOR
-            fill from ctx.fillRect so it always shows dark green, never white.
-            Kept a very short fade-in just to avoid hard pop.
-          */}
           <canvas
             ref={canvasRef}
             style={{
@@ -453,9 +493,9 @@ const HomeBanner = () => {
               inset         : 0,
               width         : "100%",
               height        : "100%",
-              opacity       : 1,               // ← FIX: always 1, no white flash
+              opacity       : 1,
               imageRendering: "crisp-edges",
-              background    : BG_COLOR,        // ← FIX: dark bg before first frame
+              background    : BG_COLOR,
             }}
           />
 
@@ -588,7 +628,7 @@ const HomeBanner = () => {
                     }}
                     className="hb-sub"
                   >
-                    {stage.sub}
+                    {stage.p}
                   </p>
                 </div>
               );
