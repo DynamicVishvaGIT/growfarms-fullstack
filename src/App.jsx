@@ -7,32 +7,25 @@ import Home from "./pages/Home";
 const App = () => {
   const [loading, setLoading] = useState(true);
 
+  // ✅ One call here — applies smooth scroll to entire site
   useSmoothScroll();
 
   return (
     <>
-      {/* ── Loader overlay ── */}
+      {/* ── Loader: shown first, disappears after duration ── */}
       <PageLoader
         loading={loading}
         onDone={() => setLoading(false)}
         duration={2800}
       />
 
-      {/*
-        ── Main site ──
-        Always rendered in the DOM so HomeBanner's frames start
-        preloading immediately behind the loader.
-        visibility:hidden keeps it fully painted but invisible
-        until the loader is done — zero white flash.
-      */}
-      <div
-        style={{
-          visibility: loading ? "hidden" : "visible",
-        }}
-      >
-        <ExploreButton />
-        <Home />
-      </div>
+      {/* ── Main site: renders after loader exits ── */}
+      {!loading && (
+        <>
+          <ExploreButton />
+          <Home />
+        </>
+      )}
     </>
   );
 };
