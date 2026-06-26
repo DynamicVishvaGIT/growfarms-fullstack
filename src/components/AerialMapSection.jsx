@@ -5,10 +5,9 @@ import home_banner_2 from "../assets/images/home_banner_2.jpg";
 
 gsap.registerPlugin(ScrollTrigger);
 
-// imgLeft / imgTop are percentages measured against the ORIGINAL image
-// (1600x1080). These never change — they describe where the location
-// actually is on the source photo, regardless of how the browser crops
-// it to fit the viewport.
+// FIX: must match HomeBanner's BG_COLOR exactly
+const BG_COLOR = "#163f1f";
+
 const pins = [
   {
     id: "skybreez",
@@ -57,28 +56,25 @@ const ZOOM_SCALE = 1.3;
 export default function AerialMapSection() {
   const [activePin, setActivePin] = useState(null);
   const [displayPositions, setDisplayPositions] = useState(() =>
-    pins.map((p) => ({ left: p.imgLeft, top: p.imgTop })),
+    pins.map((p) => ({ left: p.imgLeft, top: p.imgTop }))
   );
-  const sectionRef = useRef(null);
-  const viewportRef = useRef(null);
-  const mapRef = useRef(null);
-  const imgRef = useRef(null);
-  const pinInnerRefs = useRef([]);
-  const pinWrapRefs = useRef([]);
 
-  // Natural pixel size of the source image. Updated from the real <img>
-  // once it loads, but defaults to the known size of home_banner_2.jpg
-  // so calculations are correct even before the image fires onLoad.
+  const sectionRef    = useRef(null);
+  const viewportRef   = useRef(null);
+  const mapRef        = useRef(null);
+  const imgRef        = useRef(null);
+  const pinInnerRefs  = useRef([]);
+  const pinWrapRefs   = useRef([]);
+
   const naturalSize = useRef({ w: 1600, h: 1080 });
-
-  const panX = useRef(0);
-  const zoomRef = useRef({ scale: 1, originX: 50, originY: 50 });
+  const panX        = useRef(0);
+  const zoomRef     = useRef({ scale: 1, originX: 50, originY: 50 });
 
   const drag = useRef({
-    active: false,
-    startX: 0,
+    active  : false,
+    startX  : 0,
     startPanX: 0,
-    moved: false,
+    moved   : false,
   });
 
   const lastSelectedRef = useRef(null);
@@ -86,8 +82,7 @@ export default function AerialMapSection() {
   if (selected) lastSelectedRef.current = selected;
   const displayPin = selected || lastSelectedRef.current;
 
-  // ── Convert a pin's "original image" % into the % position on the
-  //    actual rendered (object-fit: cover cropped) box ──────────────────────
+  // ── Convert pin's source-image % → rendered box % ─────────────────────────
   const getPinDisplayPercent = useCallback((pin) => {
     const map = mapRef.current;
     if (!map) return { left: pin.imgLeft, top: pin.imgTop };
@@ -96,18 +91,18 @@ export default function AerialMapSection() {
     if (!w || !h) return { left: pin.imgLeft, top: pin.imgTop };
 
     const { w: nw, h: nh } = naturalSize.current;
-    const scale = Math.max(w / nw, h / nh);
-    const dispW = nw * scale;
-    const dispH = nh * scale;
+    const scale  = Math.max(w / nw, h / nh);
+    const dispW  = nw * scale;
+    const dispH  = nh * scale;
     const offsetX = (dispW - w) / 2;
     const offsetY = (dispH - h) / 2;
 
     const posX = (pin.imgLeft / 100) * dispW - offsetX;
-    const posY = (pin.imgTop / 100) * dispH - offsetY;
+    const posY = (pin.imgTop  / 100) * dispH - offsetY;
 
     return {
       left: (posX / w) * 100,
-      top: (posY / h) * 100,
+      top : (posY / h) * 100,
     };
   }, []);
 
@@ -115,8 +110,6 @@ export default function AerialMapSection() {
     setDisplayPositions(pins.map((p) => getPinDisplayPercent(p)));
   }, [getPinDisplayPercent]);
 
-  // Recalculate on mount, on resize, and whenever the map box itself
-  // changes size (covers width:110% + min(900px,80vw) breakpoint shifts).
   useEffect(() => {
     recalcPositions();
     const ro = new ResizeObserver(() => recalcPositions());
@@ -128,60 +121,59 @@ export default function AerialMapSection() {
     };
   }, [recalcPositions]);
 
-  // ── Clamp pan ─────────────────────────────────────────────────────────────────
+  // ── Clamp pan ─────────────────────────────────────────────────────────────
   const clampPan = useCallback((x) => {
     const viewport = viewportRef.current;
-    const map = mapRef.current;
+    const map      = mapRef.current;
     if (!viewport || !map) return x;
     const maxScroll = -(map.scrollWidth - viewport.clientWidth);
     return Math.min(0, Math.max(maxScroll, x));
   }, []);
 
-  // ── Zoom to pin ───────────────────────────────────────────────────────────────
+  // ── Zoom to pin ───────────────────────────────────────────────────────────
   const zoomToPin = useCallback(
     (pinIndex) => {
       const viewport = viewportRef.current;
-      const map = mapRef.current;
+      const map      = mapRef.current;
       if (!viewport || !map) return;
 
       const pin = pins[pinIndex];
       const { left: pinLeftPct, top: pinTopPct } = getPinDisplayPercent(pin);
 
-      const mapW = map.offsetWidth;
-      const vW = viewport.clientWidth;
-      const pinPxX = (pinLeftPct / 100) * mapW;
-
+      const mapW     = map.offsetWidth;
+      const vW       = viewport.clientWidth;
+      const pinPxX   = (pinLeftPct / 100) * mapW;
       const targetPanX = clampPan(vW / 2 - pinPxX);
 
       gsap.to(map, {
         transformOrigin: `${pinLeftPct}% ${pinTopPct}%`,
-        scale: ZOOM_SCALE,
-        x: targetPanX,
+        scale   : ZOOM_SCALE,
+        x       : targetPanX,
         duration: 0.75,
-        ease: "power3.out",
+        ease    : "power3.out",
         onUpdate() {
-          panX.current = targetPanX;
-          zoomRef.current.scale = ZOOM_SCALE;
-          zoomRef.current.originX = pinLeftPct;
-          zoomRef.current.originY = pinTopPct;
+          panX.current              = targetPanX;
+          zoomRef.current.scale     = ZOOM_SCALE;
+          zoomRef.current.originX   = pinLeftPct;
+          zoomRef.current.originY   = pinTopPct;
         },
       });
     },
-    [clampPan, getPinDisplayPercent],
+    [clampPan, getPinDisplayPercent]
   );
 
-  // ── Zoom out ──────────────────────────────────────────────────────────────────
+  // ── Zoom out ──────────────────────────────────────────────────────────────
   const zoomOut = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     gsap.to(map, {
-      scale: 1,
-      x: 0,
+      scale   : 1,
+      x       : 0,
       duration: 0.55,
-      ease: "power3.inOut",
+      ease    : "power3.inOut",
       onComplete() {
-        panX.current = 0;
-        zoomRef.current.scale = 1;
+        panX.current            = 0;
+        zoomRef.current.scale   = 1;
         zoomRef.current.originX = 50;
         zoomRef.current.originY = 50;
         map.style.transformOrigin = "50% 50%";
@@ -189,7 +181,7 @@ export default function AerialMapSection() {
     });
   }, []);
 
-  // ── Pin click ─────────────────────────────────────────────────────────────────
+  // ── Pin click ─────────────────────────────────────────────────────────────
   const handlePinClick = useCallback(
     (pinId, isActive, pinIndex) => {
       if (drag.current.moved) return;
@@ -201,30 +193,23 @@ export default function AerialMapSection() {
         zoomToPin(pinIndex);
       }
     },
-    [zoomOut, zoomToPin],
+    [zoomOut, zoomToPin]
   );
 
-  // ── Drag (pan) ───────────────────────────────────────────────────────────────
+  // ── Drag (pan) ───────────────────────────────────────────────────────────
   const onPointerDown = useCallback((e) => {
     if (zoomRef.current.scale > 1) return;
     if (e.button !== undefined && e.button !== 0) return;
-
-    // ✅ FIX: Reset moved state instantly when a click/touch sequence begins
     drag.current.moved = false;
-
-    // ✅ Agar touch/click pin pe hai toh drag start mat karo
     if (e.target.closest("[data-pin]")) return;
 
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     drag.current = {
-      active: true,
-      startX: clientX,
+      active   : true,
+      startX   : clientX,
       startPanX: panX.current,
-      moved: false,
+      moved    : false,
     };
-    // if (viewportRef.current) viewportRef.current.style.cursor = "grabbing";
-
-    // preventDefault only on non-passive desktop pointer down down to avoid touch device warnings
     if (!e.touches) e.preventDefault();
   }, []);
 
@@ -239,13 +224,12 @@ export default function AerialMapSection() {
       if (mapRef.current)
         mapRef.current.style.transform = `translateX(${newX}px)`;
     },
-    [clampPan],
+    [clampPan]
   );
 
   const onPointerUp = useCallback(() => {
     if (!drag.current.active) return;
     drag.current.active = false;
-    // if (viewportRef.current) viewportRef.current.style.cursor = "grab";
   }, []);
 
   useEffect(() => {
@@ -267,22 +251,22 @@ export default function AerialMapSection() {
     };
   }, [onPointerDown, onPointerMove, onPointerUp]);
 
-  // ── GSAP scroll entrance ──────────────────────────────────────────────────────
+  // ── GSAP scroll entrance ─────────────────────────────────────────────────
   useEffect(() => {
     const inners = pinInnerRefs.current.filter(Boolean);
     gsap.set(inners, { opacity: 0, scale: 0, transformOrigin: "50% 50%" });
 
     const trigger = ScrollTrigger.create({
       trigger: sectionRef.current,
-      start: "top 75%",
-      once: true,
+      start  : "top 75%",
+      once   : true,
       onEnter: () => {
         gsap.to(inners, {
-          opacity: 1,
-          scale: 1,
+          opacity : 1,
+          scale   : 1,
           duration: 1.0,
-          ease: "back.out(1.6)",
-          stagger: 0.7,
+          ease    : "back.out(1.6)",
+          stagger : 0.7,
         });
       },
     });
@@ -294,26 +278,54 @@ export default function AerialMapSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative">
+    /*
+      FIX: backgroundColor = BG_COLOR (same as HomeBanner)
+      This is the single most important fix — both sections share the
+      exact same background color so there is zero visible seam/patch
+      between them regardless of dvh fluctuations on Android Chrome.
+    */
+    <section
+      ref={sectionRef}
+      className="relative"
+      style={{ backgroundColor: BG_COLOR, marginTop: 0 }}
+    >
+      {/*
+        FIX: Top bridge gradient — covers any residual 1-2px gap
+        by blending BG_COLOR → transparent over the map top edge.
+      */}
+      <div
+        aria-hidden="true"
+        style={{
+          position      : "absolute",
+          top           : 0,
+          left          : 0,
+          width         : "100%",
+          height        : "48px",
+          background    : `linear-gradient(to bottom, ${BG_COLOR}, transparent)`,
+          zIndex        : 10,
+          pointerEvents : "none",
+        }}
+      />
+
       {/* ── MAP VIEWPORT ── */}
-     <div
-  ref={viewportRef}
-  className="relative overflow-hidden select-none md:!h-[1200px]"
-  style={{
-    height: "min(900px, 80vw)",
-    touchAction: "pan-y",
-  }}
->
+      <div
+        ref={viewportRef}
+        className="relative overflow-hidden select-none  xl:h-[1000px]
+    2xl:h-[1250px]"
+        style={{
+          touchAction: "pan-y",
+        }}
+      >
         {/* ── MAP INNER ── */}
         <div
           ref={mapRef}
           style={{
-            width: "110%",
-            height: "100%",
-            willChange: "transform",
-            transform: "translateX(0px) scale(1)",
+            width          : "110%",
+            height         : "100%",
+            willChange     : "transform",
+            transform      : "translateX(0px) scale(1)",
             transformOrigin: "50% 50%",
-            position: "relative",
+            position       : "relative",
           }}
         >
           <img
@@ -324,17 +336,17 @@ export default function AerialMapSection() {
             onLoad={() => {
               if (imgRef.current) {
                 naturalSize.current = {
-                  w: imgRef.current.naturalWidth || 1600,
+                  w: imgRef.current.naturalWidth  || 1600,
                   h: imgRef.current.naturalHeight || 1080,
                 };
               }
               recalcPositions();
             }}
             style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
+              width        : "100%",
+              height       : "100%",
+              objectFit    : "cover",
+              display      : "block",
               pointerEvents: "none",
             }}
           />
@@ -342,10 +354,7 @@ export default function AerialMapSection() {
           {/* ── Pins ── */}
           {pins.map((pin, i) => {
             const isActive = activePin === pin.id;
-            const pos = displayPositions[i] || {
-              left: pin.imgLeft,
-              top: pin.imgTop,
-            };
+            const pos = displayPositions[i] || { left: pin.imgLeft, top: pin.imgTop };
             return (
               <div
                 key={pin.id}
@@ -353,10 +362,10 @@ export default function AerialMapSection() {
                 data-pin={pin.id}
                 className="group"
                 style={{
-                  position: "absolute",
-                  top: `${pos.top}%`,
-                  left: `${pos.left}%`,
-                  zIndex: 25,
+                  position : "absolute",
+                  top      : `${pos.top}%`,
+                  left     : `${pos.left}%`,
+                  zIndex   : 25,
                   transform: "translate(-50%, -50%)",
                 }}
               >
@@ -364,7 +373,7 @@ export default function AerialMapSection() {
                   ref={(el) => (pinInnerRefs.current[i] = el)}
                   style={{ display: "inline-block" }}
                 >
-                  {/* Tooltip */}
+                  {/* Tooltip (desktop hover only) */}
                   {!activePin && (
                     <div
                       className="absolute bottom-full left-1/2 mb-3 w-max max-w-[160px]
@@ -376,9 +385,9 @@ export default function AerialMapSection() {
                       <div
                         className="rounded-xl px-3 py-2 text-center"
                         style={{
-                          background: "rgba(255,255,255,0.95)",
+                          background   : "rgba(255,255,255,0.95)",
                           backdropFilter: "blur(12px)",
-                          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                          boxShadow    : "0 8px 32px rgba(0,0,0,0.18)",
                         }}
                       >
                         <p className="text-[#1a4a22] font-semibold text-xs leading-tight">
@@ -388,9 +397,9 @@ export default function AerialMapSection() {
                       <div
                         className="mx-auto w-0 h-0"
                         style={{
-                          borderLeft: "5px solid transparent",
+                          borderLeft : "5px solid transparent",
                           borderRight: "5px solid transparent",
-                          borderTop: "5px solid rgba(255,255,255,0.95)",
+                          borderTop  : "5px solid rgba(255,255,255,0.95)",
                         }}
                       />
                     </div>
@@ -412,11 +421,9 @@ export default function AerialMapSection() {
                         transition-all duration-300
                         ${isActive ? "scale-150" : "group-hover:scale-125"}`}
                       style={{
-                        background: isActive
-                          ? "rgba(255,255,255,0.9)"
-                          : "rgba(255,255,255,0.35)",
+                        background   : isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)",
                         backdropFilter: "blur(6px)",
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
+                        boxShadow    : "0 2px 12px rgba(0,0,0,0.3)",
                       }}
                     >
                       <div className="w-full h-full rounded-full flex items-center justify-center">
@@ -433,18 +440,16 @@ export default function AerialMapSection() {
           })}
         </div>
 
-        {/* Bottom gradient — smooth multi-stop fade, clamped so it stays
-            proportionate at small mobile heights AND the fixed 900px
-            desktop height (instead of becoming an oversized solid block) */}
+        {/* Bottom gradient */}
         <div
           className="absolute bottom-0 left-0 w-full pointer-events-none"
           style={{
-            height: "clamp(90px, 22%, 220px)",
+            height    : "clamp(70px, 8%, 180px)",
             background: `linear-gradient(180deg,
-              rgba(49,85,55,0) 0%,
+              rgba(49,85,55,0)   0%,
               rgba(49,85,55,0.3) 35%,
               rgba(49,85,55,0.7) 65%,
-              #315537 100%)`,
+              #315537            100%)`,
             zIndex: 900,
           }}
         />
@@ -454,80 +459,31 @@ export default function AerialMapSection() {
       <div
         className="fixed right-0 z-[998] hidden sm:flex flex-col"
         style={{
-          top: "0",
-          height: "100vh",
-          width: "clamp(260px, 40%, 400px)",
+          top      : "0",
+          height   : "100vh",
+          width    : "clamp(260px, 40%, 400px)",
           background: "#DDEADF",
-          transform: activePin ? "translateX(0)" : "translateX(100%)",
+          transform : activePin ? "translateX(0)" : "translateX(100%)",
           transition: "transform 0.42s cubic-bezier(0.4,0,0.2,1)",
-          boxShadow: "-8px 0 40px rgba(0,0,0,0.18)",
+          boxShadow : "-8px 0 40px rgba(0,0,0,0.18)",
         }}
       >
         {displayPin && (
           <>
             <div className="relative">
               <button
-                onClick={() => {
-                  setActivePin(null);
-                  zoomOut();
-                }}
-                className="
-      group
-      absolute
-      top-3
-      right-3
-      w-9
-      h-9
-      flex
-      items-center
-      justify-center
-      rounded-full
-      bg-white
-      border
-      border-gray-200
-      shadow-lg
-      overflow-hidden
-      cursor-pointer
-      transition-all
-      duration-500
-      hover:scale-110
-      hover:rotate-180
-      hover:shadow-2xl
-      active:scale-95
-    "
+                onClick={() => { setActivePin(null); zoomOut(); }}
+                className="group absolute top-3 right-3 w-9 h-9 flex items-center justify-center
+                  rounded-full bg-white border border-gray-200 shadow-lg overflow-hidden
+                  cursor-pointer transition-all duration-500 hover:scale-110 hover:rotate-180
+                  hover:shadow-2xl active:scale-95"
               >
-                <span
-                  className="
-        absolute
-        inset-0
-        bg-[#315537]
-        scale-0
-        rounded-full
-        transition-transform
-        duration-500
-        group-hover:scale-100
-      "
-                />
-
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  className="
-          
-        relative
-        z-10
-        text-gray-600
-        transition-all
-        duration-500
-        group-hover:text-white
-        group-hover:scale-125
-      "
-                >
+                <span className="absolute inset-0 bg-[#315537] scale-0 rounded-full
+                  transition-transform duration-500 group-hover:scale-100" />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                  className="relative z-10 text-gray-600 transition-all duration-500
+                    group-hover:text-white group-hover:scale-125">
                   <line x1="5" y1="5" x2="19" y2="19" />
                   <line x1="19" y1="5" x2="5" y2="19" />
                 </svg>
@@ -536,20 +492,14 @@ export default function AerialMapSection() {
             <div className="flex flex-col h-full px-6 pb-6 pt-5 overflow-y-auto">
               <h2
                 className="text-[#1a3d22] mb-3"
-                style={{
-                  fontSize: "clamp(1.3rem, 2.5vw, 1.8rem)",
-                  fontWeight: 600,
-                }}
+                style={{ fontSize: "clamp(1.3rem, 2.5vw, 1.8rem)", fontWeight: 600 }}
               >
                 {displayPin.label}
               </h2>
               <p className="text-[#3d5040] leading-relaxed mb-5 text-sm">
                 {displayPin.fullDesc}
               </p>
-              <div
-                className="w-full rounded-xl mb-6"
-                style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}
-              >
+              <div className="w-full rounded-xl mb-6" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}>
                 <img
                   src={displayPin.image}
                   alt={displayPin.label}
@@ -558,13 +508,15 @@ export default function AerialMapSection() {
               </div>
               <div className="flex gap-3 mt-auto">
                 <button
-                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium transition-all duration-200 hover:opacity-90"
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium
+                    transition-all duration-200 hover:opacity-90"
                   style={{ background: "#315537" }}
                 >
                   View Details
                 </button>
                 <button
-                  className="flex-1 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-black/5"
+                  className="flex-1 py-2.5 rounded-lg text-sm font-medium
+                    transition-all duration-200 hover:bg-black/5"
                   style={{ border: "1.5px solid #315537", color: "#315537" }}
                 >
                   Enquire Now
@@ -581,26 +533,23 @@ export default function AerialMapSection() {
         <div
           className="fixed inset-0 z-[9998] sm:hidden transition-opacity duration-300"
           style={{
-            background: "rgba(0,0,0,0.45)",
-            opacity: activePin ? 1 : 0,
+            background   : "rgba(0,0,0,0.45)",
+            opacity      : activePin ? 1 : 0,
             pointerEvents: activePin ? "auto" : "none",
           }}
-          onClick={() => {
-            setActivePin(null);
-            zoomOut();
-          }}
+          onClick={() => { setActivePin(null); zoomOut(); }}
         />
 
         {/* Sheet */}
         <div
           className="fixed bottom-0 left-0 right-0 z-[9999] sm:hidden rounded-t-2xl"
           style={{
-            background: "rgba(240,245,241,0.98)",
+            background   : "rgba(240,245,241,0.98)",
             backdropFilter: "blur(20px)",
-            transform: activePin ? "translateY(0)" : "translateY(100%)",
-            transition: "transform 0.4s cubic-bezier(0.4,0,0.2,1)",
-            boxShadow: "0 -8px 40px rgba(0,0,0,0.2)",
-            maxHeight: "82vh",
+            transform    : activePin ? "translateY(0)" : "translateY(100%)",
+            transition   : "transform 0.4s cubic-bezier(0.4,0,0.2,1)",
+            boxShadow    : "0 -8px 40px rgba(0,0,0,0.2)",
+            maxHeight    : "82vh",
             pointerEvents: activePin ? "auto" : "none",
           }}
         >
@@ -614,77 +563,34 @@ export default function AerialMapSection() {
               style={{ maxHeight: "78vh" }}
             >
               <button
-                onClick={() => {
-                  setActivePin(null);
-                  zoomOut();
-                }}
+                onClick={() => { setActivePin(null); zoomOut(); }}
                 aria-label="Close"
-                className="
-    group
-    relative
-    self-end
-    w-10 h-10
-    flex items-center justify-center
-    rounded-full
-    bg-white
-    border border-gray-200
-    shadow-lg
-    overflow-hidden
-    transition-all duration-500
-    hover:scale-110
-    hover:rotate-180
-    hover:shadow-2xl
-    active:scale-95
-  "
+                className="group relative self-end w-10 h-10 flex items-center justify-center
+                  rounded-full bg-white border border-gray-200 shadow-lg overflow-hidden
+                  transition-all duration-500 hover:scale-110 hover:rotate-180
+                  hover:shadow-2xl active:scale-95"
               >
-                <span
-                  className="
-      absolute inset-0
-      bg-black
-      scale-0
-      rounded-full
-      transition-transform duration-500
-      group-hover:scale-100
-    "
-                />
-
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  className="
-      relative z-10
-      text-gray-600
-      transition-all duration-500
-      group-hover:text-white
-      group-hover:scale-125
-    "
-                >
+                <span className="absolute inset-0 bg-black scale-0 rounded-full
+                  transition-transform duration-500 group-hover:scale-100" />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                  className="relative z-10 text-gray-600 transition-all duration-500
+                    group-hover:text-white group-hover:scale-125">
                   <line x1="5" y1="5" x2="19" y2="19" />
                   <line x1="19" y1="5" x2="5" y2="19" />
                 </svg>
               </button>
+
               <h2
                 className="text-[#1a3d22] mb-2"
-                style={{
-                  fontSize: "1.5rem",
-                  fontFamily: "'Georgia', serif",
-                  fontWeight: 600,
-                }}
+                style={{ fontSize: "1.5rem", fontFamily: "'Georgia', serif", fontWeight: 600 }}
               >
                 {displayPin.label}
               </h2>
               <p className="text-[#3d5040] leading-relaxed mb-4 text-sm">
                 {displayPin.fullDesc}
               </p>
-              <div
-                className="w-full rounded-xl mb-5"
-                style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
-              >
+              <div className="w-full rounded-xl mb-5" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}>
                 <img
                   src={displayPin.image}
                   alt={displayPin.label}
@@ -693,7 +599,8 @@ export default function AerialMapSection() {
               </div>
               <div className="flex gap-3">
                 <button
-                  className="flex-1 py-3 rounded-xl text-white text-sm font-medium active:opacity-80 transition-opacity"
+                  className="flex-1 py-3 rounded-xl text-white text-sm font-medium
+                    active:opacity-80 transition-opacity"
                   style={{ background: "#315537" }}
                 >
                   View Details

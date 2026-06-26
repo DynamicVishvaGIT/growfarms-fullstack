@@ -3,35 +3,35 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 import logo_img from "../assets/images/grow-farms-logo.png";
-import cloude_1  from "../assets/images/cloude_1.png";
 
 gsap.registerPlugin(ScrollTrigger);
 
-// ─── Scroll budget ─────────────────────────────────────────────────────────────
-const getPinHeight = () => "500vh";
+// ─── constants ────────────────────────────────────────────────────────────────
+const BG_COLOR = "#163f1f"; // single source of truth for background color
+
+const getPinHeight = () =>
+  window.innerWidth < 768 ? "400vh" : "600vh";
 
 const TOTAL_SCROLLS = 5;
-const VIDEO_END   = 3 / TOTAL_SCROLLS; // 0.0 → 0.6
-const CLOUD_START = VIDEO_END;
-const CLOUD_RANGE = 2 / TOTAL_SCROLLS; // 0.6 → 1.0
+const VIDEO_END     = 3 / TOTAL_SCROLLS; // 0.0 → 0.6
 
 // ─── Text stages ──────────────────────────────────────────────────────────────
 const TEXT_STAGES = [
   {
-    heading : "Own a Piece of\nNature, Not Just Land.",
-    sub     : "Premium farmhouse plots designed for peaceful living, smart investment, and future generations.",
+    heading: "Own a Piece of\nNature, Not Just Land.",
+    sub: "Premium farmhouse plots designed for peaceful living, smart investment, and future generations.",
   },
   {
-    heading : "Where Serenity Meets\nSmart Investment.",
-    sub     : "Curated land that appreciates over time while giving you a sanctuary away from city chaos.",
+    heading: "Where Serenity Meets\nSmart Investment.",
+    sub: "Curated land that appreciates over time while giving you a sanctuary away from city chaos.",
   },
   {
-    heading : "Build Memories That\nOutlast Generations.",
-    sub     : "Lush greenery, clean air, and space to breathe — right at your doorstep, near Mumbai.",
+    heading: "Build Memories That\nOutlast Generations.",
+    sub: "Lush greenery, clean air, and space to breathe — right at your doorstep, near Mumbai.",
   },
 ];
 
-const SEGMENT    = 1 / TOTAL_SCROLLS; // 0.2 per stage
+const SEGMENT    = 1 / TOTAL_SCROLLS;
 const ENTER_FRAC = 0.28;
 const EXIT_FRAC  = 0.72;
 
@@ -42,16 +42,10 @@ const FRAME_EXT    = "webp";
 const FRAME_PAD    = 1;
 const BATCH_SIZE   = 20;
 
-const pad   = (n, w) => (w > 1 ? String(n).padStart(w, "0") : String(n));
-const clamp = (v) => Math.max(0, Math.min(1, v));
-const easeOut3 = (t) => 1 - Math.pow(1 - t, 3);
-const easeIn3  = (t) => Math.pow(t, 3);
-
-const applyCloud = (el, xPct, opacity) => {
-  if (!el) return;
-  el.style.transform = `translateX(${xPct}%)`;
-  el.style.opacity   = opacity;
-};
+const pad      = (n, w) => (w > 1 ? String(n).padStart(w, "0") : String(n));
+const clamp    = (v)    => Math.max(0, Math.min(1, v));
+const easeOut3 = (t)    => 1 - Math.pow(1 - t, 3);
+const easeIn3  = (t)    => Math.pow(t, 3);
 
 // ══════════════════════════════════════════════════════════════════════════════
 const HomeBanner = () => {
@@ -70,22 +64,17 @@ const HomeBanner = () => {
   const lerpRef      = useRef(0);
   const lerpRafRef   = useRef(null);
 
-  const textStageRefs = useRef(TEXT_STAGES.map(() => ({
-    wrap   : null,
-    eyebrow: null,
-    h1     : null,
-    p      : null,
-  })));
-
-  const cloudLMobRef  = useRef(null);
-  const cloudLDeskRef = useRef(null);
-  const cloudRMobRef  = useRef(null);
-  const cloudRDeskRef = useRef(null);
+  const textStageRefs = useRef(
+    TEXT_STAGES.map(() => ({ wrap: null, eyebrow: null, h1: null, p: null }))
+  );
 
   // ── vh fix ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const set = () => {
-      document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
+      document.documentElement.style.setProperty(
+        "--vh",
+        `${window.innerHeight * 0.01}px`
+      );
       setPinHeight(getPinHeight());
     };
     set();
@@ -112,28 +101,44 @@ const HomeBanner = () => {
     const dw = Math.ceil(bw * scale), dh = Math.ceil(bh * scale);
     const dx = Math.round((cw - dw) / 2), dy = Math.round((ch - dh) / 2);
 
-    ctx.fillStyle = "#163f1f";
+    // FIX: fill the whole canvas with BG_COLOR first so no transparent strip
+    ctx.fillStyle = BG_COLOR;
     ctx.fillRect(0, 0, cw, ch);
     ctx.drawImage(bitmap, dx, dy, dw, dh);
   }, []);
 
-  // ── Resize canvas ────────────────────────────────────────────────────────────
+  // ── Resize canvas ─────────────────────────────────────────────────────────
+  // FIX: use stickyRef.clientHeight instead of window.innerHeight
+  // Android Chrome toolbar changes dvh dynamically; clientHeight is stable
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const resize = () => {
-      const pr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = canvas.offsetWidth, h = canvas.offsetHeight;
-      if (canvas.width !== Math.round(w * pr) || canvas.height !== Math.round(h * pr)) {
-        canvas.width  = Math.round(w * pr);
-        canvas.height = Math.round(h * pr);
-        lastFrameRef.current = -1;
-        if (framesRef.current.length > 0) drawFrame(Math.max(0, lastFrameRef.current));
+      const pr     = Math.min(window.devicePixelRatio || 1, 2);
+      const sticky = stickyRef.current;
+
+      // clientWidth/clientHeight reflect the actual rendered box size —
+      // NOT the dvh unit which fluctuates with Android's address bar
+      const w = sticky ? sticky.clientWidth  : window.innerWidth;
+      const h = sticky ? sticky.clientHeight : window.innerHeight;
+
+      canvas.width  = Math.round(w * pr);
+      canvas.height = Math.round(h * pr);
+
+      lastFrameRef.current = -1;
+
+      if (framesRef.current.length) {
+        const vidP = Math.min(progressRef.current / VIDEO_END, 1);
+        drawFrame(Math.round(vidP * (FRAME_COUNT - 1)));
       }
     };
+
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
+    // FIX: also observe stickyRef so dvh changes trigger a redraw
+    if (stickyRef.current) ro.observe(stickyRef.current);
     return () => ro.disconnect();
   }, [drawFrame]);
 
@@ -154,7 +159,7 @@ const HomeBanner = () => {
         await Promise.all(
           slice.map(async (url, j) => {
             try {
-              const res = await fetch(url);
+              const res  = await fetch(url);
               const blob = await res.blob();
               bitmaps[i + j] = await createImageBitmap(blob, {
                 colorSpaceConversion: "none",
@@ -184,7 +189,8 @@ const HomeBanner = () => {
 
   // ── applyTextStages ──────────────────────────────────────────────────────────
   const applyTextStages = useCallback((p) => {
-  let currentActive = activeIdx;
+    let currentActive = 0;
+
     TEXT_STAGES.forEach((_, i) => {
       const refs   = textStageRefs.current[i];
       if (!refs.wrap) return;
@@ -207,9 +213,13 @@ const HomeBanner = () => {
         yH1     = 32 * (1 - t);
         yEye    = 20 * (1 - t);
         yP      = 44 * (1 - t);
+        currentActive = 0;
       } else if (local <= ENTER_FRAC && !isFirst) {
         const t = easeOut3(local / ENTER_FRAC);
-        opacity = t; yH1 = 32 * (1 - t); yEye = 20 * (1 - t); yP = 44 * (1 - t);
+        opacity = t;
+        yH1     = 32 * (1 - t);
+        yEye    = 20 * (1 - t);
+        yP      = 44 * (1 - t);
       } else if (isLast) {
         opacity = 1; yH1 = 0; yEye = 0; yP = 0;
         currentActive = i;
@@ -230,7 +240,7 @@ const HomeBanner = () => {
       if (refs.p)       refs.p.style.transform       = `translateY(${yP}px)`;
     });
 
-    setActiveIdx(activeIdx);
+    setActiveIdx(currentActive);
   }, []);
 
   // ── Lerp loop ────────────────────────────────────────────────────────────────
@@ -238,103 +248,40 @@ const HomeBanner = () => {
     const tick = () => {
       const target = progressRef.current;
       const diff   = target - lerpRef.current;
-if (Math.abs(diff) < 0.5 / FRAME_COUNT) {
-  lerpRef.current = target;
 
-  const p = target;
+      if (Math.abs(diff) < 0.5 / FRAME_COUNT) {
+        lerpRef.current    = target;
+        lerpRafRef.current = null;
+        const p      = target;
+        const videoP = Math.min(p / VIDEO_END, 1);
+        drawFrame(Math.round(videoP * (FRAME_COUNT - 1)));
+        applyTextStages(p);
+        return;
+      }
 
-  // Draw final frame
-  const videoP = Math.min(p / VIDEO_END, 1);
-  drawFrame(Math.round(videoP * (FRAME_COUNT - 1)));
-
-  // Update clouds
- const cloudP =
-  p <= CLOUD_START
-    ? 0
-    : clamp(
-        (p - CLOUD_START) /
-          CLOUD_RANGE
-      );
-
-  applyCloud(
-    cloudLDeskRef.current,
-    -130 + cloudP * 130,
-    cloudP
-  );
-
-  applyCloud(
-    cloudRMobRef.current,
-    130 - cloudP * 130,
-    cloudP
-  );
-
-  applyCloud(
-    cloudRDeskRef.current,
-    130 - cloudP * 130,
-    cloudP
-  );
-
-  applyTextStages(p);
-
-  lerpRafRef.current = null;
-  return;
-}
-
-     const ease = Math.abs(diff) > 0.2 ? 0.12 : 0.08;
-lerpRef.current += diff * ease;
+      const ease = Math.abs(diff) > 0.2 ? 0.12 : 0.08;
+      lerpRef.current += diff * ease;
       const p = lerpRef.current;
 
-      // Canvas
-      const videoP   = Math.min(p / VIDEO_END, 1);
-      drawFrame(
-  Math.round(
-    Math.min(
-      lerpRef.current / VIDEO_END,
-      1
-    ) *
-      (FRAME_COUNT - 1)
-  )
-);
-
-      // Clouds
-      const cloudP = clamp((p - CLOUD_START) / CLOUD_RANGE);
-      applyCloud(cloudLMobRef.current,  -130 + cloudP * 130, cloudP);
-      applyCloud(cloudLDeskRef.current, -130 + cloudP * 130, cloudP);
-      applyCloud(cloudRMobRef.current,   130 - cloudP * 130, cloudP);
-      applyCloud(cloudRDeskRef.current,  130 - cloudP * 130, cloudP);
-
-      // Text
+      const videoP = Math.min(p / VIDEO_END, 1);
+      drawFrame(Math.round(videoP * (FRAME_COUNT - 1)));
       applyTextStages(p);
 
       lerpRafRef.current = requestAnimationFrame(tick);
     };
-    if (!lerpRafRef.current) lerpRafRef.current = requestAnimationFrame(tick);
+    if (!lerpRafRef.current)
+      lerpRafRef.current = requestAnimationFrame(tick);
   }, [drawFrame, applyTextStages]);
 
   // ── ScrollTrigger ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!ready) return;
 
-    // Init clouds
-    [cloudLMobRef, cloudLDeskRef].forEach(({ current: el }) => {
-      if (!el) return;
-      el.style.transform  = "translateX(-130%)";
-      el.style.opacity    = "0";
-      el.style.willChange = "transform, opacity";
-    });
-    [cloudRMobRef, cloudRDeskRef].forEach(({ current: el }) => {
-      if (!el) return;
-      el.style.transform  = "translateX(130%)";
-      el.style.opacity    = "0";
-      el.style.willChange = "transform, opacity";
-    });
-
-    // Init text stages
     textStageRefs.current.forEach((refs, i) => {
       if (!refs.wrap) return;
       refs.wrap.style.willChange = "opacity";
       const visible = i === 0;
-      refs.wrap.style.opacity = visible ? "1" : "0";
+      refs.wrap.style.opacity    = visible ? "1" : "0";
       const eyeY = visible ? "0px" : "20px";
       const h1Y  = visible ? "0px" : "32px";
       const pY   = visible ? "0px" : "44px";
@@ -346,21 +293,18 @@ lerpRef.current += diff * ease;
     if (triggerRef.current) { triggerRef.current.kill(); triggerRef.current = null; }
 
     triggerRef.current = ScrollTrigger.create({
-  trigger: pinWrapRef.current,
-  start: "top top",
-  end: "bottom bottom",
-
-  pin: stickyRef.current,
-
-  anticipatePin: 1,
-  pinSpacing: false,
-
-  fastScrollEnd: true,
-  invalidateOnRefresh: true,
-   onUpdate(self) {
-  progressRef.current = gsap.utils.clamp(0, 1, self.progress);
-  startLerp();
-},
+      trigger          : pinWrapRef.current,
+      start            : "top top",
+      end              : "bottom bottom",
+      pin              : stickyRef.current,
+      pinSpacing       : true,
+      anticipatePin    : 1,
+      invalidateOnRefresh: true,
+      fastScrollEnd    : true,
+      onUpdate(self) {
+        progressRef.current = gsap.utils.clamp(0, 1, self.progress);
+        startLerp();
+      },
     });
 
     ScrollTrigger.refresh();
@@ -371,29 +315,25 @@ lerpRef.current += diff * ease;
     };
   }, [ready, startLerp]);
 
-useEffect(() => {
-  const refresh = () => {
-    ScrollTrigger.refresh();
-  };
+  // Refresh on resize / orientation
+  useEffect(() => {
+    const refresh = () => ScrollTrigger.refresh(true);
+    window.addEventListener("resize", refresh);
+    window.addEventListener("orientationchange", refresh);
+    return () => {
+      window.removeEventListener("resize", refresh);
+      window.removeEventListener("orientationchange", refresh);
+    };
+  }, []);
 
-  window.addEventListener(
-    "resize",
-    refresh
-  );
-
-  return () => {
-    window.removeEventListener(
-      "resize",
-      refresh
-    );
-  };
-}, []);
+  useEffect(() => {
+    if (triggerRef.current) ScrollTrigger.refresh();
+  }, [pinHeight]);
 
   // ── JSX ─────────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        /* ── Heading ── */
         .hb-heading {
           font-size: clamp(2rem, 5vw, 3.25rem);
           font-weight: 300;
@@ -406,8 +346,6 @@ useEffect(() => {
           text-shadow: 0 4px 32px rgba(0,0,0,0.4);
           margin: 0 auto 1.25rem;
         }
-
-        /* ── Eyebrow ── */
         .hb-eyebrow {
           font-size: clamp(0.6rem, 1vw, 0.75rem);
           font-weight: 500;
@@ -420,52 +358,62 @@ useEffect(() => {
           max-width: 18ch;
           text-shadow: 0 1px 8px rgba(0,0,0,0.3);
         }
-
-        /* ── Sub copy ── */
         .hb-sub {
           font-size: clamp(0.78rem, 1.2vw, 1rem);
           font-weight: 300;
           line-height: 1.7;
           color: rgba(255, 255, 255, 0.68);
           width: 100%;
-          max-width: 34ch;
+          max-width: 32ch;
           margin: 0 auto;
           text-shadow: 0 1px 12px rgba(0,0,0,0.3);
         }
       `}</style>
 
+      {/*
+        FIX 1: pinWrapRef gets backgroundColor: BG_COLOR
+        This fills the GSAP pin-spacer background so no dark strip
+        appears between HomeBanner and the next section during scroll.
+      */}
       <div
         ref={pinWrapRef}
-        className="overflow-visible"
-        style={{ height: pinHeight, position: "relative", zIndex: 30 }}
+        className="overflow-hidden"
+        style={{
+          height         : pinHeight,
+          position       : "relative",
+          zIndex         : 30,
+          backgroundColor: BG_COLOR, // ← KEY FIX
+        }}
       >
+        {/*
+          FIX 2: stickyRef gets the same backgroundColor.
+          When dvh changes (Android toolbar show/hide), before canvas
+          repaints there's a flash of this background — must match.
+        */}
         <div
           ref={stickyRef}
           className="relative w-full"
-          style={{ height: "calc(var(--vh, 1vh) * 100)", overflow: "visible" }}
+          style={{
+            height         : "100dvh",
+            overflow       : "hidden",
+            backgroundColor: BG_COLOR, // ← KEY FIX
+          }}
         >
-
           {/* Canvas */}
           <canvas
             ref={canvasRef}
-            className="absolute inset-0 w-full h-full"
             style={{
-              opacity       : ready ? 1 : 0,
-              transition    : "opacity 0.4s ease",
-              imageRendering: "crisp-edges",
-            }}
-          />
-
-          {/* Bottom gradient */}
-          <div
-            className="absolute bottom-0 left-0 w-full pointer-events-none"
-            style={{
-              height: "30%", zIndex: 10,
-              background: `linear-gradient(to top,
-                rgba(14,42,20,0.98) 0%,
-                rgba(22,63,31,0.80) 30%,
-                rgba(22,63,31,0.35) 60%,
-                transparent 100%)`,
+              position       : "absolute",
+              inset          : 0,
+              // FIX 3: width/height 100% of parent, NOT 100dvh
+              // The parent is already 100dvh; using 100dvh on canvas
+              // can overshoot when dvh changes and leave a gap
+              width          : "100%",
+              height         : "100%",
+              opacity        : ready ? 1 : 0,
+              transition     : "opacity 0.4s ease",
+              imageRendering : "crisp-edges",
+              display        : "block",
             }}
           />
 
@@ -473,8 +421,9 @@ useEffect(() => {
           <div
             className="absolute top-0 left-0 w-full pointer-events-none"
             style={{
-              height: "22%", zIndex: 10,
-              background: "linear-gradient(to bottom, rgba(14,42,20,0.5) 0%, transparent 100%)",
+              height    : "22%",
+              zIndex    : 10,
+              background: `linear-gradient(to bottom, rgba(14,42,20,0.5) 0%, transparent 100%)`,
             }}
           />
 
@@ -487,97 +436,25 @@ useEffect(() => {
             />
           </div>
 
-          {/* ── Hero text stages ── */}
-          <div className="absolute inset-0 z-20 pointer-events-none select-none">
-            {TEXT_STAGES.map((stage, i) => {
-              const isFirst = i === 0;
-              return (
-                <div
-                  key={i}
-                  ref={(el) => {
-                    if (!textStageRefs.current[i]) return;
-                    textStageRefs.current[i].wrap = el;
-                    if (el) {
-                      el.style.opacity    = isFirst ? "1" : "0";
-                      el.style.willChange = "opacity";
-                    }
-                  }}
-                  className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 sm:px-10"
-                  style={{ paddingBottom: "8rem" }}
-                >
-                  {/* Eyebrow */}
-                  <span
-                    ref={(el) => {
-                      if (!textStageRefs.current[i]) return;
-                      textStageRefs.current[i].eyebrow = el;
-                      if (el) {
-                        el.style.transform  = isFirst ? "translateY(0px)" : "translateY(20px)";
-                        el.style.willChange = "transform";
-                      }
-                    }}
-                    className="hb-eyebrow"
-                  >
-                    {stage.eyebrow}
-                  </span>
-
-                  {/* Heading */}
-                  <h1
-                    ref={(el) => {
-                      if (!textStageRefs.current[i]) return;
-                      textStageRefs.current[i].h1 = el;
-                      if (el) {
-                        el.style.transform  = isFirst ? "translateY(0px)" : "translateY(32px)";
-                        el.style.willChange = "transform";
-                      }
-                    }}
-                    className="hb-heading"
-                  >
-                    {stage.heading}
-                  </h1>
-
-                  {/* Sub */}
-                  <p
-                    ref={(el) => {
-                      if (!textStageRefs.current[i]) return;
-                      textStageRefs.current[i].p = el;
-                      if (el) {
-                        el.style.transform  = isFirst ? "translateY(0px)" : "translateY(44px)";
-                        el.style.willChange = "transform";
-                      }
-                    }}
-                    className="hb-sub"
-                  >
-                    {stage.sub}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Left cloud — mobile */}
-          <div ref={cloudLMobRef} className="absolute pointer-events-none md:hidden"
-            style={{ bottom: "-5%", left: "-10%", width: "280px", zIndex: 40, opacity: 0, transform: "translateX(-130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" style={{ transform: "scaleX(-1)" }} />
-          </div>
-
-          {/* Left cloud — desktop */}
-          <div ref={cloudLDeskRef} className="absolute pointer-events-none hidden md:block"
-            style={{ bottom: "-28%", left: "-40%", width: "clamp(700px,100vw,1800px)", zIndex: 40, opacity: 0, transform: "translateX(-130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" style={{ transform: "scaleX(-1)" }} />
-          </div>
-
-          {/* Right cloud — mobile */}
-          <div ref={cloudRMobRef} className="absolute pointer-events-none md:hidden"
-            style={{ bottom: "-5%", right: "-10%", width: "280px", zIndex: 40, opacity: 0, transform: "translateX(130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" />
-          </div>
-
-          {/* Right cloud — desktop */}
-          <div ref={cloudRDeskRef} className="absolute pointer-events-none hidden md:block"
-            style={{ bottom: "-28%", right: "-40%", width: "clamp(700px,100vw,1800px)", zIndex: 40, opacity: 0, transform: "translateX(130%)" }}>
-            <img src={cloude_1} alt="" className="w-full h-auto object-contain" />
-          </div>
-
+          {/*
+            FIX 4: Bottom gradient end color = BG_COLOR
+            This seamlessly bridges HomeBanner bottom into AerialMapSection top.
+            Both sections share BG_COLOR so there is zero visible seam.
+          */}
+          <div
+            className="absolute bottom-0 left-0 w-full pointer-events-none"
+            style={{
+              // FIX 5: height 100% instead of clamp — ensures it always
+              // reaches the very bottom pixel of the sticky container
+              height : "clamp(80px, 35%, 220px)",
+              background: `linear-gradient(180deg,
+                rgba(22,63,31,0)   0%,
+                rgba(22,63,31,0.4) 40%,
+                rgba(22,63,31,0.8) 70%,
+                ${BG_COLOR}        100%)`,
+              zIndex: 20,
+            }}
+          />
         </div>
       </div>
     </>

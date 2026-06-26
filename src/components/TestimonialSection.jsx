@@ -13,8 +13,6 @@ const TestimonialSection = () => {
         className="absolute inset-0 w-full h-full pointer-events-none"
       />
 
-   
-
       {/* Content */}
       <div
         className="relative flex flex-col items-center pt-16 pb-16 md:pt-20 md:pb-20"
