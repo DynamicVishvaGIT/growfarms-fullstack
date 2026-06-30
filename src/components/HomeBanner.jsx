@@ -6,11 +6,20 @@ import logo_img from "../assets/images/grow-farms-logo.png";
 
 gsap.registerPlugin(ScrollTrigger);
 
-// ─── constants ────────────────────────────────────────────────────────────────
-const BG_COLOR = "#163f1f"; // single source of truth for background color
+// FIX: Tell GSAP to ignore resize events caused by mobile browser toolbar
+// show/hide (the address bar collapsing/expanding on scroll). Without this,
+// every toolbar toggle fires a "resize" that can trigger pin recalculation
+// mid-scroll, which is what produced the gap between this section and the
+// next one when scrolling UP on mobile (toolbar re-appearing = resize event).
+ScrollTrigger.config({ ignoreMobileResize: true });
 
-const getPinHeight = () =>
-  window.innerWidth < 768 ? "400vh" : "600vh";
+// ─── constants ────────────────────────────────────────────────────────────────
+const BG_COLOR = "#163f1f";
+
+// Detect mobile ONCE at module load — won't change mid-session
+const IS_MOBILE = window.innerWidth < 768;
+
+const getPinHeight = () => (window.innerWidth < 768 ? "400vh" : "600vh");
 
 const TOTAL_SCROLLS = 5;
 const VIDEO_END     = 3 / TOTAL_SCROLLS; // 0.0 → 0.6
@@ -35,12 +44,28 @@ const SEGMENT    = 1 / TOTAL_SCROLLS;
 const ENTER_FRAC = 0.28;
 const EXIT_FRAC  = 0.72;
 
-// ─── Frame config ──────────────────────────────────────────────────────────────
+// ─── Frame config ─────────────────────────────────────────────────────────────
+// Mobile frames: portrait optimised  → public/frames-mobile/%d.webp
+//   Generate with:
+//   ffmpeg -i "src/assets/farm_video.mp4" -vf "fps=24,scale=-2:1080" \
+//          -vcodec libwebp -compression_level 4 -qscale:v 80 -an \
+//          public/frames-mobile/%d.webp
+//
+// Desktop frames: landscape          → public/frames/%d.webp
+//   Generate with:
+//   ffmpeg -i "src/assets/farm_video.mp4" -vf "fps=24,scale=1920:-2" \
+//          -vcodec libwebp -compression_level 4 -qscale:v 90 -an \
+//          public/frames/%d.webp
+// ─────────────────────────────────────────────────────────────────────────────
 const FRAME_COUNT  = 114;
-const FRAME_PREFIX = "/frames/";
+const FRAME_PREFIX = IS_MOBILE ? "/frames-mobile/" : "/frames/";
 const FRAME_EXT    = "webp";
 const FRAME_PAD    = 1;
 const BATCH_SIZE   = 20;
+
+// DPR cap: mobile → 1.5x  (portrait frames are already 1080px tall, plenty)
+//          desktop → 2x
+const DPR_CAP = IS_MOBILE ? 1.5 : 2;
 
 const pad      = (n, w) => (w > 1 ? String(n).padStart(w, "0") : String(n));
 const clamp    = (v)    => Math.max(0, Math.min(1, v));
@@ -82,6 +107,17 @@ const HomeBanner = () => {
     return () => window.removeEventListener("resize", set);
   }, []);
 
+  // ── Force pin-spacer background ──────────────────────────────────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      document.querySelectorAll(".gsap-pin-spacer").forEach((el) => {
+        el.style.backgroundColor = BG_COLOR;
+      });
+    }, 100);
+    setTimeout(() => clearInterval(interval), 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   // ── drawFrame ────────────────────────────────────────────────────────────────
   const drawFrame = useCallback((index) => {
     const idx    = Math.max(0, Math.min(index, FRAME_COUNT - 1));
@@ -97,34 +133,38 @@ const HomeBanner = () => {
     ctx.imageSmoothingQuality = "high";
 
     const bw = bitmap.width, bh = bitmap.height;
-    const scale = Math.max(cw / bw, ch / bh);
-    const dw = Math.ceil(bw * scale), dh = Math.ceil(bh * scale);
-    const dx = Math.round((cw - dw) / 2), dy = Math.round((ch - dh) / 2);
 
-    // FIX: fill the whole canvas with BG_COLOR first so no transparent strip
+    // object-fit: cover behaviour
+    const scale = Math.max(cw / bw, ch / bh);
+    const dw    = Math.ceil(bw * scale);
+    const dh    = Math.ceil(bh * scale);
+    const dx    = Math.round((cw - dw) / 2);
+    const dy    = Math.round((ch - dh) / 2);
+
     ctx.fillStyle = BG_COLOR;
     ctx.fillRect(0, 0, cw, ch);
     ctx.drawImage(bitmap, dx, dy, dw, dh);
   }, []);
 
-  // ── Resize canvas ─────────────────────────────────────────────────────────
-  // FIX: use stickyRef.clientHeight instead of window.innerHeight
-  // Android Chrome toolbar changes dvh dynamically; clientHeight is stable
+  // ── Resize canvas ──────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const resize = () => {
-      const pr     = Math.min(window.devicePixelRatio || 1, 2);
       const sticky = stickyRef.current;
 
-      // clientWidth/clientHeight reflect the actual rendered box size —
-      // NOT the dvh unit which fluctuates with Android's address bar
-      const w = sticky ? sticky.clientWidth  : window.innerWidth;
-      const h = sticky ? sticky.clientHeight : window.innerHeight;
+      // Use stickyRef dimensions — stable against Android toolbar dvh changes
+      const w = (sticky?.clientWidth  > 0 ? sticky.clientWidth  : window.innerWidth);
+      const h = (sticky?.clientHeight > 0 ? sticky.clientHeight : window.innerHeight);
 
-      canvas.width  = Math.round(w * pr);
-      canvas.height = Math.round(h * pr);
+      // Internal pixel buffer (retina-aware, capped per device type)
+      canvas.width  = Math.round(w * DPR_CAP);
+      canvas.height = Math.round(h * DPR_CAP);
+
+      // Explicit CSS px — prevents "100%" mismatch when dvh fluctuates
+      canvas.style.width  = `${w}px`;
+      canvas.style.height = `${h}px`;
 
       lastFrameRef.current = -1;
 
@@ -137,7 +177,6 @@ const HomeBanner = () => {
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
-    // FIX: also observe stickyRef so dvh changes trigger a redraw
     if (stickyRef.current) ro.observe(stickyRef.current);
     return () => ro.disconnect();
   }, [drawFrame]);
@@ -200,10 +239,7 @@ const HomeBanner = () => {
       const start   = i * SEGMENT;
       const local   = (p - start) / SEGMENT;
 
-      let opacity = 0;
-      let yH1     = 32;
-      let yEye    = 20;
-      let yP      = 44;
+      let opacity = 0, yH1 = 32, yEye = 20, yP = 44;
 
       if (p < start) {
         opacity = 0; yH1 = 32; yEye = 20; yP = 44;
@@ -285,39 +321,75 @@ const HomeBanner = () => {
       const eyeY = visible ? "0px" : "20px";
       const h1Y  = visible ? "0px" : "32px";
       const pY   = visible ? "0px" : "44px";
-      if (refs.eyebrow) { refs.eyebrow.style.transform = `translateY(${eyeY})`; refs.eyebrow.style.willChange = "transform"; }
-      if (refs.h1)      { refs.h1.style.transform      = `translateY(${h1Y})`;  refs.h1.style.willChange      = "transform"; }
-      if (refs.p)       { refs.p.style.transform       = `translateY(${pY})`;   refs.p.style.willChange       = "transform"; }
+      if (refs.eyebrow) {
+        refs.eyebrow.style.transform  = `translateY(${eyeY})`;
+        refs.eyebrow.style.willChange = "transform";
+      }
+      if (refs.h1) {
+        refs.h1.style.transform  = `translateY(${h1Y})`;
+        refs.h1.style.willChange = "transform";
+      }
+      if (refs.p) {
+        refs.p.style.transform  = `translateY(${pY})`;
+        refs.p.style.willChange = "transform";
+      }
     });
 
-    if (triggerRef.current) { triggerRef.current.kill(); triggerRef.current = null; }
+    if (triggerRef.current) {
+      triggerRef.current.kill();
+      triggerRef.current = null;
+    }
 
     triggerRef.current = ScrollTrigger.create({
-      trigger          : pinWrapRef.current,
-      start            : "top top",
-      end              : "bottom bottom",
-      pin              : stickyRef.current,
-      pinSpacing       : true,
-      anticipatePin    : 1,
+      trigger            : pinWrapRef.current,
+      start              : "top top",
+      end                : "bottom bottom",
+      pin                : stickyRef.current,
+      pinSpacing         : true,
+      anticipatePin      : 1,
       invalidateOnRefresh: true,
-      fastScrollEnd    : true,
+      fastScrollEnd      : true,
       onUpdate(self) {
         progressRef.current = gsap.utils.clamp(0, 1, self.progress);
         startLerp();
       },
     });
 
+    // Force pin-spacer background after GSAP creates it
+    setTimeout(() => {
+      document.querySelectorAll(".gsap-pin-spacer").forEach((el) => {
+        el.style.backgroundColor = BG_COLOR;
+      });
+    }, 50);
+
     ScrollTrigger.refresh();
 
     return () => {
-      if (triggerRef.current) { triggerRef.current.kill(); triggerRef.current = null; }
+      if (triggerRef.current) {
+        triggerRef.current.kill();
+        triggerRef.current = null;
+      }
       if (lerpRafRef.current) cancelAnimationFrame(lerpRafRef.current);
     };
   }, [ready, startLerp]);
 
-  // Refresh on resize / orientation
+  // ── Refresh on resize / orientation ─────────────────────────────────────────
+  // FIX: Only refresh ScrollTrigger when the viewport WIDTH actually changes
+  // (real resize / orientation change). Mobile browsers fire plain "resize"
+  // events when the address bar shows/hides during scroll — that only changes
+  // HEIGHT. Refreshing on those mid-scroll recalculates pin start/end against
+  // a transitional viewport size, which is what caused the visible gap
+  // between this section and AerialMapSection when scrolling UP on mobile.
   useEffect(() => {
-    const refresh = () => ScrollTrigger.refresh(true);
+    let lastWidth = window.innerWidth;
+
+    const refresh = () => {
+      if (window.innerWidth !== lastWidth) {
+        lastWidth = window.innerWidth;
+        ScrollTrigger.refresh(true);
+      }
+    };
+
     window.addEventListener("resize", refresh);
     window.addEventListener("orientationchange", refresh);
     return () => {
@@ -368,13 +440,44 @@ const HomeBanner = () => {
           margin: 0 auto;
           text-shadow: 0 1px 12px rgba(0,0,0,0.3);
         }
+        .gsap-pin-spacer {
+          background-color: #163f1f !important;
+        }
+
+        /* Loading bar */
+        .hb-loader {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 50;
+          background: ${BG_COLOR};
+          gap: 16px;
+          transition: opacity 0.4s ease;
+        }
+        .hb-loader-bar-wrap {
+          width: min(240px, 60vw);
+          height: 2px;
+          background: rgba(255,255,255,0.12);
+          border-radius: 2px;
+          overflow: hidden;
+        }
+        .hb-loader-bar {
+          height: 100%;
+          background: rgba(163, 201, 110, 0.85);
+          border-radius: 2px;
+          transition: width 0.2s ease;
+        }
+        .hb-loader-pct {
+          font-size: 0.7rem;
+          letter-spacing: 0.15em;
+          color: rgba(255,255,255,0.4);
+          font-weight: 400;
+        }
       `}</style>
 
-      {/*
-        FIX 1: pinWrapRef gets backgroundColor: BG_COLOR
-        This fills the GSAP pin-spacer background so no dark strip
-        appears between HomeBanner and the next section during scroll.
-      */}
       <div
         ref={pinWrapRef}
         className="overflow-hidden"
@@ -382,40 +485,52 @@ const HomeBanner = () => {
           height         : pinHeight,
           position       : "relative",
           zIndex         : 30,
-          backgroundColor: BG_COLOR, // ← KEY FIX
+          backgroundColor: BG_COLOR,
         }}
       >
-        {/*
-          FIX 2: stickyRef gets the same backgroundColor.
-          When dvh changes (Android toolbar show/hide), before canvas
-          repaints there's a flash of this background — must match.
-        */}
         <div
           ref={stickyRef}
           className="relative w-full"
           style={{
-            height         : "100dvh",
+            // FIX: was "100dvh". dvh live-resizes as the mobile toolbar
+            // shows/hides, which desynced this element's actual rendered
+            // height from the 400vh/600vh scroll distance GSAP pinned it
+            // against — producing the gap on scroll-up. svh ("small"
+            // viewport height) assumes the toolbar is always visible and
+            // never changes mid-scroll, so the pin math stays consistent.
+            height         : "100svh",
             overflow       : "hidden",
-            backgroundColor: BG_COLOR, // ← KEY FIX
+            backgroundColor: BG_COLOR,
+            position       : "relative",
           }}
         >
-          {/* Canvas */}
+          {/* Canvas — size set explicitly via JS, not 100% */}
           <canvas
             ref={canvasRef}
             style={{
-              position       : "absolute",
-              inset          : 0,
-              // FIX 3: width/height 100% of parent, NOT 100dvh
-              // The parent is already 100dvh; using 100dvh on canvas
-              // can overshoot when dvh changes and leave a gap
-              width          : "100%",
-              height         : "100%",
-              opacity        : ready ? 1 : 0,
-              transition     : "opacity 0.4s ease",
-              imageRendering : "crisp-edges",
-              display        : "block",
+              position      : "absolute",
+              inset         : 0,
+              opacity       : ready ? 1 : 0,
+              transition    : "opacity 0.4s ease",
+              imageRendering: "crisp-edges",
+              display       : "block",
+              backgroundColor: BG_COLOR,
+              // width & height set explicitly by resize() in JS
             }}
           />
+
+          {/* Loading screen — shown until ready */}
+          {!ready && (
+            <div className="hb-loader">
+              <div className="hb-loader-bar-wrap">
+                <div
+                  className="hb-loader-bar"
+                  style={{ width: `${loadPct}%` }}
+                />
+              </div>
+              <span className="hb-loader-pct">{loadPct}%</span>
+            </div>
+          )}
 
           {/* Top vignette */}
           <div
@@ -436,17 +551,53 @@ const HomeBanner = () => {
             />
           </div>
 
-          {/*
-            FIX 4: Bottom gradient end color = BG_COLOR
-            This seamlessly bridges HomeBanner bottom into AerialMapSection top.
-            Both sections share BG_COLOR so there is zero visible seam.
-          */}
+          {/* Text stages */}
+          <div
+            className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
+            style={{ paddingBottom: "8vh" }}
+          >
+            <div className="relative w-full text-center px-6">
+              {TEXT_STAGES.map((stage, i) => (
+                <div
+                  key={i}
+                  ref={(el) => { if (el) textStageRefs.current[i].wrap = el; }}
+                  style={{
+                    position    : i === 0 ? "relative" : "absolute",
+                    top         : i === 0 ? "auto"     : 0,
+                    left        : 0,
+                    right       : 0,
+                    opacity     : i === 0 ? 1          : 0,
+                    pointerEvents: "none",
+                  }}
+                >
+                  <span
+                    ref={(el) => { if (el) textStageRefs.current[i].eyebrow = el; }}
+                    className="hb-eyebrow"
+                  >
+                    Grow Farms
+                  </span>
+                  <h1
+                    ref={(el) => { if (el) textStageRefs.current[i].h1 = el; }}
+                    className="hb-heading"
+                  >
+                    {stage.heading}
+                  </h1>
+                  <p
+                    ref={(el) => { if (el) textStageRefs.current[i].p = el; }}
+                    className="hb-sub"
+                  >
+                    {stage.sub}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom gradient — blends into AerialMapSection */}
           <div
             className="absolute bottom-0 left-0 w-full pointer-events-none"
             style={{
-              // FIX 5: height 100% instead of clamp — ensures it always
-              // reaches the very bottom pixel of the sticky container
-              height : "clamp(80px, 35%, 220px)",
+              height   : "clamp(80px, 35%, 220px)",
               background: `linear-gradient(180deg,
                 rgba(22,63,31,0)   0%,
                 rgba(22,63,31,0.4) 40%,

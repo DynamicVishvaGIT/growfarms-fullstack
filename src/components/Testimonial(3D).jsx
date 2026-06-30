@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
 
 const DATA = [
-  "forest",
-  "mountains",
-  "river",
-  "waterfall",
-  "lake",
-  "sunset nature",
-  "beach nature",
+  "fcx0LV7C2pE",
+  "DxA4B7bJpRk",
+  "AYSdZFo1Yxw",
+  "1xkuNlpQhvc",
+  "d8ul6Akvu7o",
+  "TJfRcYy5y1M",
 ];
 
 const N = DATA.length;
@@ -16,12 +15,12 @@ const halfAngleRad = Math.PI / N;
 // Desktop values — untouched
 const W_PX = 700;
 const GAP_PX = 30;
-const Z_PX = -1 * (W_PX / 2 + GAP_PX) / Math.tan(halfAngleRad);
+const Z_PX = (-1 * (W_PX / 2 + GAP_PX)) / Math.tan(halfAngleRad);
 
 // Mobile values
 const MW_PX = 260;
 const MGAP_PX = 12;
-const MZ_PX = -1 * (MW_PX / 2 + MGAP_PX) / Math.tan(halfAngleRad);
+const MZ_PX = (-1 * (MW_PX / 2 + MGAP_PX)) / Math.tan(halfAngleRad);
 
 function getScreenType() {
   if (typeof window === "undefined") return "desktop";
@@ -34,6 +33,7 @@ function getScreenType() {
 
 export default function Carousel3D() {
   const [paused, setPaused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(null);
   const [screenType, setScreenType] = useState(getScreenType);
 
   useEffect(() => {
@@ -49,9 +49,20 @@ export default function Carousel3D() {
   const zVal = mobile ? MZ_PX : Z_PX;
   const persp = mobile ? 600 : 1000;
 
-  // ONLY HEIGHTS CHANGED
   const cardH = mobile ? 190 : laptop ? 300 : 400;
   const sceneHeight = mobile ? "35vh" : laptop ? "50vh" : "70vh";
+
+  const handleCardClick = (i, e) => {
+    e.stopPropagation(); // don't let this bubble up and just toggle the ring
+    setActiveIndex(i);
+    setPaused(true); // freeze rotation so the playing video stays in view
+  };
+
+  const handleSceneClick = () => {
+    // clicking empty space resumes rotation and stops any active video
+    setPaused((p) => !p);
+    setActiveIndex(null);
+  };
 
   return (
     <>
@@ -91,6 +102,10 @@ export default function Carousel3D() {
           display: block;
         }
 
+        .c3d-card.active {
+          box-shadow: 0 0 0 3px #fff, 0 18px 45px rgba(0,0,0,0.35);
+        }
+
         .c3d-card img {
           width: 100%;
           height: 100%;
@@ -107,25 +122,38 @@ export default function Carousel3D() {
 
       <div
         className="c3d-scene"
-        onClick={() => setPaused((p) => !p)}
+        onClick={handleSceneClick}
         title={paused ? "Click to resume" : "Click to pause"}
       >
         <div className="c3d-a3d">
-          {DATA.map((code, i) => {
+          {DATA.map((videoId, i) => {
             const angleDeg = (360 / N) * i;
+            const isActive = activeIndex === i;
 
             return (
               <div
-                key={code}
-                className="c3d-card"
+                key={videoId}
+                className={`c3d-card${isActive ? " active" : ""}`}
                 style={{
                   transform: `rotateY(${angleDeg}deg) translateZ(${zVal}px)`,
                 }}
+                onClick={(e) => handleCardClick(i, e)}
               >
-                <img
-                  // src={`https://source.unsplash.com/900x700/?${code}`}
-                  alt={`Testimonial ${i + 1}`}
-                  loading="lazy"
+                <iframe
+                  src={`https://www.youtube.com/embed/${videoId}?${
+                    isActive
+                      ? "autoplay=1&mute=0&controls=1"
+                      : "mute=1&controls=0"
+                  }&loop=1&playlist=${videoId}`}
+                  title={`Video ${i + 1}`}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                  }}
                 />
               </div>
             );
