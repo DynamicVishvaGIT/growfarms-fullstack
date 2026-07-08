@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const DATA = [
   "fcx0LV7C2pE",
@@ -31,13 +31,49 @@ function getScreenType() {
 
 export default function Carousel3D() {
   const [paused, setPaused] = useState(false);
-  const [playingIndex, setPlayingIndex] = useState(null); // single source of truth
+  const [playingIndex, setPlayingIndex] = useState(null);
   const [screenType, setScreenType] = useState(getScreenType);
+  const [centerIndex, setCenterIndex] = useState(null);
+  const cardRefs = useRef([]);
 
   useEffect(() => {
     const onResize = () => setScreenType(getScreenType());
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Detects which card is currently front-facing in the 3D rotation by
+  // comparing rendered widths (perspective makes the front-most card
+  // appear widest). Throttled to ~10fps since this doesn't need to be
+  // pixel-perfect every frame — it's just driving a highlight.
+  useEffect(() => {
+    let rafId;
+    let lastCheck = 0;
+
+    const loop = (time) => {
+      if (time - lastCheck > 100) {
+        lastCheck = time;
+        let maxWidth = -Infinity;
+        let maxIdx = null;
+
+        cardRefs.current.forEach((el, i) => {
+          if (!el) return;
+          const w = el.getBoundingClientRect().width;
+          if (w > maxWidth) {
+            maxWidth = w;
+            maxIdx = i;
+          }
+        });
+
+        if (maxIdx !== null) {
+          setCenterIndex((prev) => (prev !== maxIdx ? maxIdx : prev));
+        }
+      }
+      rafId = requestAnimationFrame(loop);
+    };
+
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
   }, []);
 
   const mobile = screenType === "mobile";
@@ -50,20 +86,16 @@ export default function Carousel3D() {
   const cardH = mobile ? 190 : laptop ? 300 : 400;
   const sceneHeight = mobile ? "35vh" : laptop ? "50vh" : "70vh";
 
-  // Click a card -> play its video immediately, pause the ring
   const handleCardClick = (i, e) => {
     e.stopPropagation();
     setPlayingIndex(i);
     setPaused(true);
   };
 
-  // Click outside a card -> toggle pause/resume.
-  // Resuming always stops whatever video was playing, so the ring
-  // never spins with a video still active behind it.
   const handleSceneClick = () => {
     setPaused((prev) => {
       const next = !prev;
-      if (!next) setPlayingIndex(null); // resuming -> stop video
+      if (!next) setPlayingIndex(null);
       return next;
     });
   };
@@ -77,7 +109,7 @@ export default function Carousel3D() {
           height: ${sceneHeight};
           overflow: hidden;
           perspective: ${persp}px;
-          cursor: pointer;
+          cursor: default;
         }
 
         .c3d-a3d {
@@ -105,11 +137,31 @@ export default function Carousel3D() {
           background: #fff;
           display: block;
           position: relative;
-          transition: box-shadow 0.25s ease;
+          cursor: default;
+          outline: 0px solid #fff;
+          outline-offset: 0px;
+          transition: box-shadow 0.25s ease, outline-width 0.25s ease, filter 0.25s ease;
         }
 
+        /* outline (not box-shadow) avoids a Safari/WebKit rendering bug
+           where box-shadow can fail to draw, or get clipped, on elements
+           that have backface-visibility: hidden inside a preserve-3d
+           parent. Outline is composited separately and isn't affected. */
         .c3d-card.active {
-          box-shadow: 0 0 0 3px #fff, 0 18px 45px rgba(0,0,0,0.35);
+          outline-width: 4px;
+          box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+          filter: brightness(1.03);
+        }
+
+        /* Highlight for whichever card is currently front-facing during
+           rotation. Kept independent of .active (click-to-play state) —
+           deliberately not touching  here, since the inline
+           transform on each card (rotateY/translateZ/scale) always wins
+           over anything set via a class. */
+        .c3d-card.centered {
+          outline-width: 3px;
+          outline-color: rgba(255, 255, 255, 0.85);
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.32);
         }
 
         .c3d-card-overlay {
@@ -160,23 +212,30 @@ export default function Carousel3D() {
         onClick={handleSceneClick}
         title={paused ? "Click outside to resume" : "Click a card to play"}
       >
+
         <div className="c3d-a3d">
           {DATA.map((videoId, i) => {
             const angleDeg = (360 / N) * i;
             const isPlaying = playingIndex === i;
+            const isCentered = centerIndex === i;
 
             return (
               <div
                 key={videoId}
-                className={`c3d-card${isPlaying ? " active" : ""}`}
+                ref={(el) => (cardRefs.current[i] = el)}
+                className={`c3d-card${isPlaying ? " active" : ""}${
+                  isCentered ? " centered" : ""
+                }`}
                 style={{
-                  transform: `rotateY(${angleDeg}deg) translateZ(${zVal}px)`,
+                  // scale is applied HERE, inline, because a transform set
+                  // via the .active CSS class would be silently overridden
+                  // by this inline style (inline always wins for the same
+                  // property) — so a class-based scale never actually shows.
+                  transform: `rotateY(${angleDeg}deg) translateZ(${zVal}px) scale(${
+                    isPlaying ? 1.05 : 1
+                  })`,
                 }}
               >
-                {/* Overlay only exists while NOT playing — catches the
-                    click since clicks landing inside the iframe never
-                    bubble to React (cross-origin document). Once playing,
-                    the overlay is removed so YouTube's own controls work. */}
                 {!isPlaying && (
                   <div
                     className="c3d-card-overlay"
