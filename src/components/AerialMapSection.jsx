@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import home_banner_2 from "../assets/images/home_banner_2.jpg";
+import { useNavigate } from "react-router-dom";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -277,6 +278,9 @@ export default function AerialMapSection() {
     };
   }, []);
 
+
+  const navigate = useNavigate();
+
   return (
     /*
       FIX: backgroundColor = BG_COLOR (same as HomeBanner)
@@ -541,6 +545,7 @@ export default function AerialMapSection() {
               </div>
               <div className="flex gap-3 mt-auto">
                 <button
+                  onClick={() => navigate("/details")}
                   className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium
                     transition-all duration-200 hover:opacity-90"
                   style={{ background: "#315537" }}
@@ -654,6 +659,7 @@ export default function AerialMapSection() {
               </div>
               <div className="flex gap-3">
                 <button
+                  onClick={() => navigate("/details")}
                   className="flex-1 py-3 rounded-xl text-white text-sm font-medium
                     active:opacity-80 transition-opacity"
                   style={{ background: "#315537" }}

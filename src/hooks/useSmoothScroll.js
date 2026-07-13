@@ -9,36 +9,91 @@ let lenisInstance = null;
 
 export const getLenis = () => lenisInstance;
 
+
 const useSmoothScroll = () => {
+
   useEffect(() => {
+
+    // prevent duplicate Lenis instance
+    if (lenisInstance) return;
+
+
     const lenis = new Lenis({
-      duration       : 1.2,          // scroll duration feel (higher = slower/smoother)
-      easing         : (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // expo ease-out
-      orientation    : "vertical",
-      smoothWheel    : true,
+      duration: 1.2,
+
+      easing: (t) =>
+        Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+
+      orientation: "vertical",
+
+      smoothWheel: true,
+
       wheelMultiplier: 1,
-      touchMultiplier: 2,            // slightly faster on touch for mobile feel
+
+      touchMultiplier: 2,
     });
+
 
     lenisInstance = lenis;
 
-    // Sync Lenis with GSAP ScrollTrigger
-    lenis.on("scroll", ScrollTrigger.update);
 
-    // Drive Lenis via GSAP ticker for frame-perfect sync
-    gsap.ticker.add((time) => {
+
+    // Lenis scroll update GSAP
+    const handleScroll = () => {
+      ScrollTrigger.update();
+    };
+
+
+    lenis.on("scroll", handleScroll);
+
+
+
+    // IMPORTANT
+    // Keep same reference for cleanup
+    const raf = (time) => {
       lenis.raf(time * 1000);
-    });
+    };
 
-    // Prevent GSAP ticker from lagging behind on blur/focus
+
+    gsap.ticker.add(raf);
+
+
     gsap.ticker.lagSmoothing(0);
 
+
+
     return () => {
+
+
+      // remove exact ticker
+      gsap.ticker.remove(raf);
+
+
+
+      lenis.off(
+        "scroll",
+        handleScroll
+      );
+
+
+
       lenis.destroy();
+
+
+
       lenisInstance = null;
-      gsap.ticker.remove((time) => lenis.raf(time * 1000));
+
+
+
+      ScrollTrigger.refresh(true);
+
     };
+
+
   }, []);
+
+
 };
+
 
 export default useSmoothScroll;

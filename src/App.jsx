@@ -1,37 +1,51 @@
 import { useState } from "react";
+import { Routes, Route } from "react-router-dom";
+
 import ExploreButton from "./components/ExploreButton";
 import PageLoader from "./components/PageLoader";
 import useSmoothScroll from "./hooks/useSmoothScroll";
+import useScrollRefresh from "./hooks/useScrollRefresh";
+
 import Home from "./pages/Home";
+import About from "./pages/About";
+import Blogs from "./pages/Blogs";
+import Testimonials from "./pages/Testimonials";
+import Contact from "./pages/Contact";
+import Details from "./pages/Details";
 
 const App = () => {
   const [loading, setLoading] = useState(true);
 
   useSmoothScroll();
 
+  // ✅ React Router change के बाद GSAP refresh
+  useScrollRefresh();
+
   return (
     <>
-      {/* ── Loader overlay ── */}
+      {/* Loader */}
       <PageLoader
         loading={loading}
         onDone={() => setLoading(false)}
         duration={2800}
       />
 
-      {/*
-        ── Main site ──
-        Always rendered in the DOM so HomeBanner's frames start
-        preloading immediately behind the loader.
-        visibility:hidden keeps it fully painted but invisible
-        until the loader is done — zero white flash.
-      */}
+      {/* Main Website */}
       <div
         style={{
           visibility: loading ? "hidden" : "visible",
         }}
       >
         <ExploreButton />
-        <Home />
+
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/blogs" element={<Blogs />} />
+          <Route path="/testimonials" element={<Testimonials />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/details" element={<Details />} />
+        </Routes>
       </div>
     </>
   );

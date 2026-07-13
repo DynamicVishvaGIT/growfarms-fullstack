@@ -12,12 +12,10 @@ const DATA = [
 const N = DATA.length;
 const halfAngleRad = Math.PI / N;
 
-// Desktop values — untouched
 const W_PX = 700;
 const GAP_PX = 30;
 const Z_PX = (-1 * (W_PX / 2 + GAP_PX)) / Math.tan(halfAngleRad);
 
-// Mobile values
 const MW_PX = 260;
 const MGAP_PX = 12;
 const MZ_PX = (-1 * (MW_PX / 2 + MGAP_PX)) / Math.tan(halfAngleRad);
@@ -42,10 +40,6 @@ export default function Carousel3D() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Detects which card is currently front-facing in the 3D rotation by
-  // comparing rendered widths (perspective makes the front-most card
-  // appear widest). Throttled to ~10fps since this doesn't need to be
-  // pixel-perfect every frame — it's just driving a highlight.
   useEffect(() => {
     let rafId;
     let lastCheck = 0;
@@ -86,13 +80,12 @@ export default function Carousel3D() {
   const cardH = mobile ? 190 : laptop ? 300 : 400;
   const sceneHeight = mobile ? "35vh" : laptop ? "50vh" : "70vh";
 
-  const handleCardClick = (i, e) => {
-    e.stopPropagation();
+  const handleCardClick = (i) => {
     setPlayingIndex(i);
     setPaused(true);
   };
 
-  const handleSceneClick = () => {
+  const handleBgClick = () => {
     setPaused((prev) => {
       const next = !prev;
       if (!next) setPlayingIndex(null);
@@ -104,12 +97,22 @@ export default function Carousel3D() {
     <>
       <style>{`
         .c3d-scene {
+          position: relative;
           display: grid;
           width: 100%;
           height: ${sceneHeight};
-          overflow: hidden;
           perspective: ${persp}px;
           cursor: default;
+        }
+
+        /* Invisible full-area bg captures pause/resume clicks
+           so the giant transformed bounding box of c3d-a3d
+           never needs to be the event target */
+        .c3d-scene-bg {
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          cursor: pointer;
         }
 
         .c3d-a3d {
@@ -118,6 +121,10 @@ export default function Carousel3D() {
           transform-style: preserve-3d;
           animation: rotateRing 28s linear infinite;
           animation-play-state: ${paused ? "paused" : "running"};
+          position: relative;
+          z-index: 1;
+          /* Disable the huge transformed hitbox — cards re-enable individually */
+          pointer-events: none;
         }
 
         @keyframes rotateRing {
@@ -134,51 +141,61 @@ export default function Carousel3D() {
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
           box-shadow: 0 18px 45px rgba(0,0,0,0.22);
-          background: #fff;
+          background: #000;
           display: block;
           position: relative;
-          cursor: default;
-          outline: 0px solid #fff;
+          cursor: pointer;
+          outline: 0px solid transparent;
           outline-offset: 0px;
           transition: box-shadow 0.25s ease, outline-width 0.25s ease, filter 0.25s ease;
+          /* Re-enable pointer events per-card */
+          pointer-events: auto;
+          will-change: transform;
+          z-index: 1;
         }
 
-        /* outline (not box-shadow) avoids a Safari/WebKit rendering bug
-           where box-shadow can fail to draw, or get clipped, on elements
-           that have backface-visibility: hidden inside a preserve-3d
-           parent. Outline is composited separately and isn't affected. */
         .c3d-card.active {
-          outline-width: 4px;
+          outline: 4px solid rgba(255,255,255,0.9);
           box-shadow: 0 25px 60px rgba(0,0,0,0.5);
           filter: brightness(1.03);
+          /* Lift active card above all siblings */
+          z-index: 1000;
         }
 
-        /* Highlight for whichever card is currently front-facing during
-           rotation. Kept independent of .active (click-to-play state) —
-           deliberately not touching  here, since the inline
-           transform on each card (rotateY/translateZ/scale) always wins
-           over anything set via a class. */
         .c3d-card.centered {
-          outline-width: 3px;
-          outline-color: rgba(255, 255, 255, 0.85);
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.32);
+          outline: 3px solid rgba(255,255,255,0.85);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.32);
         }
 
+        /* Thumbnail image fills card */
+        .c3d-thumb {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          pointer-events: none;
+        }
+
+        /* Play button overlay — only on non-playing cards */
         .c3d-card-overlay {
           position: absolute;
           inset: 0;
           z-index: 2;
-          background: transparent;
-          cursor: pointer;
+          background: rgba(0,0,0,0);
           display: grid;
           place-items: center;
+          transition: background 0.2s ease;
+        }
+
+        .c3d-card-overlay:hover {
+          background: rgba(0,0,0,0.15);
         }
 
         .c3d-play-hint {
           width: 56px;
           height: 56px;
           border-radius: 50%;
-          background: rgba(0,0,0,0.55);
+          background: rgba(0,0,0,0.6);
           color: #fff;
           display: grid;
           place-items: center;
@@ -193,10 +210,11 @@ export default function Carousel3D() {
           opacity: 1;
         }
 
-        .c3d-card img {
+        /* iframe only renders for the active card */
+        .c3d-iframe {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          border: none;
           display: block;
         }
 
@@ -207,11 +225,14 @@ export default function Carousel3D() {
         }
       `}</style>
 
-      <div
-        className="c3d-scene"
-        onClick={handleSceneClick}
-        title={paused ? "Click outside to resume" : "Click a card to play"}
-      >
+      <div className="c3d-scene">
+        {/* Background layer handles pause/resume — avoids relying on
+            the giant transformed bounding box of c3d-a3d as event target */}
+        <div
+          className="c3d-scene-bg"
+          onClick={handleBgClick}
+          title={paused ? "Click to resume" : "Click to pause"}
+        />
 
         <div className="c3d-a3d">
           {DATA.map((videoId, i) => {
@@ -224,43 +245,40 @@ export default function Carousel3D() {
                 key={videoId}
                 ref={(el) => (cardRefs.current[i] = el)}
                 className={`c3d-card${isPlaying ? " active" : ""}${
-                  isCentered ? " centered" : ""
+                  !isPlaying && isCentered ? " centered" : ""
                 }`}
                 style={{
-                  // scale is applied HERE, inline, because a transform set
-                  // via the .active CSS class would be silently overridden
-                  // by this inline style (inline always wins for the same
-                  // property) — so a class-based scale never actually shows.
                   transform: `rotateY(${angleDeg}deg) translateZ(${zVal}px) scale(${
                     isPlaying ? 1.05 : 1
                   })`,
                 }}
               >
-                {!isPlaying && (
-                  <div
-                    className="c3d-card-overlay"
-                    onClick={(e) => handleCardClick(i, e)}
-                  >
-                    <span className="c3d-play-hint">▶</span>
-                  </div>
+                {isPlaying ? (
+                  /* Only ONE iframe at a time — avoids 6 stacked interactive iframes */
+                  <iframe
+                    className="c3d-iframe"
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&loop=1&playlist=${videoId}`}
+                    title={`Video ${i + 1}`}
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                ) : (
+                  <>
+                    {/* Thumbnail instead of idle iframe — no stacked hitboxes */}
+                    <img
+                      className="c3d-thumb"
+                      src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+                      alt={`Video ${i + 1}`}
+                    />
+                    <div
+                      className="c3d-card-overlay"
+                      onClick={() => handleCardClick(i)}
+                    >
+                      <span className="c3d-play-hint">▶</span>
+                    </div>
+                  </>
                 )}
-
-                <iframe
-                  src={`https://www.youtube.com/embed/${videoId}?${
-                    isPlaying
-                      ? "autoplay=1&mute=0&controls=1"
-                      : "mute=1&controls=0"
-                  }&loop=1&playlist=${videoId}`}
-                  title={`Video ${i + 1}`}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    border: "none",
-                  }}
-                />
               </div>
             );
           })}
