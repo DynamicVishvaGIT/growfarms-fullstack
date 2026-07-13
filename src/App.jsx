@@ -3,7 +3,7 @@ import { Routes, Route } from "react-router-dom";
 
 import ExploreButton from "./components/ExploreButton";
 import PageLoader from "./components/PageLoader";
-import useScrollRefresh from "./hooks/useSmoothScroll";
+import useSmoothScroll from "./hooks/useSmoothScroll";
 
 import Home from "./pages/Home";
 import About from "./pages/About";
