@@ -14,7 +14,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
  *     ...
  *   }
  */
-const useScrollRefresh = () => {
+const ScrollRefresh = () => {
   const location = useLocation();
 
   useEffect(() => {
@@ -31,4 +31,4 @@ const useScrollRefresh = () => {
   }, [location.pathname]);
 };
 
-export default useScrollRefresh;
+export default ScrollRefresh;
