@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import DetailsBanner from "../assets/images/Details_Banner.png";
 import Hospital from "../assets/images/hospital.png";
-import School from "../assets/images/School.png";
+import School from "../assets/images/school.png";
 import College from "../assets/images/College.png";
 import Store from "../assets/images/local_market.png";
 import Highway from "../assets/images/Highway.png";
