@@ -1121,7 +1121,7 @@ const HomeBanner = () => {
                       if (textStageRefs.current[i])
                         textStageRefs.current[i].p = el;
                     }}
-                    className="hb-sub"
+                    className="hb-sub sub_font"
                     style={{
                       willChange: "transform",
                       transform : i === 0 ? "translateY(0px)" : "translateY(44px)",

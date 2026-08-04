@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 import ExploreButton from "./components/ExploreButton";
+import ScrollRefresh from "./components/ScrollRefresh";
 import PageLoader from "./components/PageLoader";
+
 import useSmoothScroll from "./hooks/useSmoothScroll";
 
 import Home from "./pages/Home";
@@ -11,44 +14,65 @@ import Blogs from "./pages/Blogs";
 import Testimonials from "./pages/Testimonials";
 import Contact from "./pages/Contact";
 import Details from "./pages/Details";
-import ScrollRefresh from "./components/ScrollRefresh";
+
+import FooterSection from "./components/FooterSection";
 
 const App = () => {
-  const [loading, setLoading] = useState(true);
+
+  const [loading,setLoading] = useState(true);
 
   useSmoothScroll();
 
-  // ✅ React Router change के बाद GSAP refresh
   ScrollRefresh();
-
+  
   return (
     <>
-      {/* Loader */}
       <PageLoader
         loading={loading}
-        onDone={() => setLoading(false)}
+        onDone={()=>{
+          setLoading(false);
+
+          setTimeout(()=>{
+            ScrollTrigger.refresh();
+          },100);
+
+        }}
         duration={2800}
       />
 
-      {/* Main Website */}
-      <div
+
+      <main
         style={{
-          visibility: loading ? "hidden" : "visible",
+          visibility: loading ? "hidden":"visible"
         }}
       >
+
         <ExploreButton />
 
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/blogs" element={<Blogs />} />
-          <Route path="/testimonials" element={<Testimonials />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/details" element={<Details />} />
+
+          <Route path="/" element={<Home/>}/>
+
+          <Route path="/about" element={<About/>}/>
+
+          <Route path="/blogs" element={<Blogs/>}/>
+
+          <Route path="/testimonials" element={<Testimonials/>}/>
+
+          <Route path="/contact" element={<Contact/>}/>
+
+          <Route path="/details" element={<Details/>}/>
+
         </Routes>
-      </div>
+
+
+        <FooterSection />
+
+      </main>
+
     </>
   );
 };
+
 
 export default App;

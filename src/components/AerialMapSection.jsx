@@ -530,7 +530,7 @@ export default function AerialMapSection() {
               >
                 {displayPin.label}
               </h2>
-              <p className="text-[#3d5040] leading-relaxed mb-5 text-sm">
+              <p className="text-[#3d5040] leading-relaxed mb-5 text-sm sub_font">
                 {displayPin.fullDesc}
               </p>
               <div
@@ -638,7 +638,6 @@ export default function AerialMapSection() {
                 className="text-[#1a3d22] mb-2"
                 style={{
                   fontSize: "1.5rem",
-                  fontFamily: "'Georgia', serif",
                   fontWeight: 600,
                 }}
               >

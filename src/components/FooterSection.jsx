@@ -3,7 +3,7 @@ import logo_img from "../assets/images/grow-farms-logo.png";
 
 const FooterSection = () => {
   return (
-     <footer className="relative w-full overflow-hidden bg-[#224E28]">
+     <footer className="relative w-full sub_font overflow-hidden bg-[#224E28]">
 
 
   {/* Watermark — contained, no overflow */}

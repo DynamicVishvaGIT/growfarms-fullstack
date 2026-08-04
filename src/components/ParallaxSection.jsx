@@ -91,7 +91,7 @@ const ParallaxSection = () => {
             />
             <button
               className="rounded-full backdrop-blur-md border border-white/30
-                text-white font-medium transition-all duration-300 hover:scale-105
+                text-white sub_font font-medium transition-all duration-300 hover:scale-105
                 leading-snug"
               style={{
                 width: "clamp(56px, 10vw, 70px)",

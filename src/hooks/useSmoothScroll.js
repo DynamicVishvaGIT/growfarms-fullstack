@@ -36,17 +36,12 @@ const useSmoothScroll = () => {
 
     lenisInstance = lenis;
 
-
-
     // Lenis scroll update GSAP
     const handleScroll = () => {
       ScrollTrigger.update();
     };
 
-
     lenis.on("scroll", handleScroll);
-
-
 
     // IMPORTANT
     // Keep same reference for cleanup
