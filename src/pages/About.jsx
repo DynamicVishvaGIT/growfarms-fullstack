@@ -40,7 +40,7 @@ const About = () => {
             className="text-white font-light tracking-[0.25em] text-3xl sm:text-4xl md:text-5xl lg:text-6xl"
             style={{ textShadow: "0 4px 20px rgba(0,0,0,0.45)" }}
           >
-            Blog
+            About Us 
           </h1>
         </div>
 

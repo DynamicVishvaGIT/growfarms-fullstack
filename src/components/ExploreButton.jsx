@@ -9,7 +9,7 @@ const ExploreButton = () => {
     { name: "Home", path: "/" },
     { name: "About Us", path: "/about" },
     { name: "Blogs", path: "/blogs" },
-    { name: "Testimonials", path: "/testimonials" },
+    // { name: "Testimonials", path: "/testimonials" },
     { name: "Contact Us", path: "/contact" },
   ];
 
