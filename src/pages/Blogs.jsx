@@ -39,7 +39,6 @@ const Blogs = () => {
             }}
           />
 
-         
         </div>
 
         {/* "Blog" title — vertically & horizontally centered */}
