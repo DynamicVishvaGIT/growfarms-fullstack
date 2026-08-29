@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import BlogBanner from "../assets/images/Blog_Banner_2.jpeg";
@@ -13,6 +13,7 @@ import img6 from "../assets/images/Blog_Banner_2.jpeg";
 import img7 from "../assets/images/Blog_Banner_2.jpeg";
 import img8 from "../assets/images/Blog_Banner_2.jpeg";
 import img9 from "../assets/images/Blog_Banner_2.jpeg";
+import { useNavigate } from "react-router-dom";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -102,11 +103,14 @@ const BlogCard = ({ img, title }) => {
     });
   };
 
+  const navigate = useNavigate()
+
   return (
     <div
       className="flex flex-col gap-2 cursor-pointer"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={()=> navigate("/blog-details")}
     >
       <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
         <img

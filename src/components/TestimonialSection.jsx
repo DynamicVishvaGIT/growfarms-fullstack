@@ -1,4 +1,3 @@
-import React from 'react'
 import Carousel3D from '../components/Testimonial(3D)'
 
 const TestimonialSection = () => {

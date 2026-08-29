@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import ContactBanner from "../assets/images/Contact_banner.png";
 import logo_img from "../assets/images/grow-farms-logo.png";
 import CardVector from "../assets/images/Vector__4_.png";
@@ -32,121 +32,125 @@ const infoCards = [
 ];
 
 const Contact = () => {
-  const sectionRef = useRef(null);
+  /* ---------- Page-wide ref (scopes the GSAP context) ---------- */
+  const pageRef = useRef(null);
+
+  /* ---------- Section-level refs — same granularity as About.jsx ---------- */
+  const cardsWrapRef = useRef(null); // whole info-cards grid, one block
+  const imageRef = useRef(null); // side image panel
+  const formRef = useRef(null); // form panel (heading + inputs together)
+  const mapRef = useRef(null); // map section
+
+  // Kept for the floating arrow-bubble query below (not used for stagger reveal)
   const cardRefs = useRef([]);
-  const imageRef = useRef(null);
-  const formRef = useRef(null);
-  const fieldRefs = useRef([]);
   const buttonRef = useRef(null);
-  const mapRef = useRef(null);
-
   cardRefs.current = [];
-  fieldRefs.current = [];
+  const addCardRef = (el) => el && cardRefs.current.push(el);
 
-  const addCardRef = (el) => {
-    if (el && !cardRefs.current.includes(el)) cardRefs.current.push(el);
-  };
-  const addFieldRef = (el) => {
-    if (el && !fieldRefs.current.includes(el)) fieldRefs.current.push(el);
-  };
+  /* ---------- GSAP ScrollTrigger — About.jsx-style section reveals ---------- */
+  useLayoutEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  useEffect(() => {
+    if (prefersReducedMotion) return;
+
     const ctx = gsap.context(() => {
-      gsap.fromTo(
-        cardRefs.current,
-        { opacity: 0, y: 50, scale: 0.96 },
+      const mm = gsap.matchMedia();
+
+      mm.add(
         {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.8,
-          stagger: 0.15,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 80%",
-          },
+          isMobile: "(max-width: 639px)",
+          isDesktop: "(min-width: 640px)",
         },
+        (context) => {
+          const { isMobile } = context.conditions;
+          const travel = isMobile ? 28 : 44;
+          const dur = isMobile ? 0.65 : 0.85;
+
+          // Shared helper — always fromTo so final state is explicit
+          // (identical to the reveal() helper in About.jsx)
+          const reveal = (el, extraFrom = {}, extraTo = {}, startPos = "top 85%") => {
+            if (!el) return;
+            gsap.fromTo(
+              el,
+              { y: travel, opacity: 0, ...extraFrom },
+              {
+                y: 0,
+                opacity: 1,
+                duration: dur,
+                ease: "power3.out",
+                scrollTrigger: {
+                  trigger: el,
+                  start: startPos,
+                  once: true,
+                },
+                ...extraTo,
+              }
+            );
+          };
+
+          reveal(cardsWrapRef.current, {}, {}, "top 82%");
+          reveal(
+            imageRef.current,
+            { x: isMobile ? 0 : -60, y: isMobile ? travel : 0, scale: 1.05 },
+            { x: 0, scale: 1, duration: 1 },
+            "top 85%"
+          );
+          reveal(formRef.current, {}, {}, "top 85%");
+          reveal(mapRef.current, { scale: 0.97 }, { scale: 1, duration: 1 }, "top 88%");
+
+          // Continuous float on the arrow bubbles — unrelated to scroll reveal,
+          // kept as an interactive/ambient animation like About's mouse parallax
+          cardRefs.current.forEach((card) => {
+            const bubble = card.querySelector(".arrow-bubble");
+            if (!bubble) return;
+            gsap.to(bubble, {
+              y: -8,
+              duration: 1.6,
+              repeat: -1,
+              yoyo: true,
+              ease: "sine.inOut",
+            });
+          });
+
+          // Refresh after layout settles (identical to About.jsx)
+          const images = pageRef.current
+            ? Array.from(pageRef.current.querySelectorAll("img"))
+            : [];
+          let loaded = 0;
+          const onLoad = () => {
+            loaded += 1;
+            if (loaded >= images.length) ScrollTrigger.refresh();
+          };
+          images.forEach((img) => {
+            if (img.complete) onLoad();
+            else {
+              img.addEventListener("load", onLoad, { once: true });
+              img.addEventListener("error", onLoad, { once: true });
+            }
+          });
+
+          let resizeTimer;
+          const onResize = () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => ScrollTrigger.refresh(), 200);
+          };
+          window.addEventListener("resize", onResize);
+
+          return () => {
+            window.removeEventListener("resize", onResize);
+            clearTimeout(resizeTimer);
+            images.forEach((img) => {
+              img.removeEventListener("load", onLoad);
+              img.removeEventListener("error", onLoad);
+            });
+          };
+        }
       );
+    }, pageRef);
 
-      gsap.fromTo(
-        imageRef.current,
-        { opacity: 0, x: -60, scale: 1.05 },
-        {
-          opacity: 1,
-          x: 0,
-          scale: 1,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: imageRef.current,
-            start: "top 85%",
-          },
-        },
-      );
-
-      gsap.fromTo(
-        formRef.current,
-        { opacity: 0, y: 40 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.9,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: formRef.current,
-            start: "top 85%",
-          },
-        },
-      );
-
-      gsap.fromTo(
-        fieldRefs.current,
-        { opacity: 0, y: 20 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.6,
-          stagger: 0.08,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: formRef.current,
-            start: "top 75%",
-          },
-        },
-      );
-
-      // Map reveal — scale up from slightly small
-      gsap.fromTo(
-        mapRef.current,
-        { opacity: 0, scale: 0.97, y: 30 },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: mapRef.current,
-            start: "top 85%",
-          },
-        },
-      );
-
-      cardRefs.current.forEach((card) => {
-        const bubble = card.querySelector(".arrow-bubble");
-        if (!bubble) return;
-        gsap.to(bubble, {
-          y: -8,
-          duration: 1.6,
-          repeat: -1,
-          yoyo: true,
-          ease: "sine.inOut",
-        });
-      });
-    }, sectionRef);
-
-    return () => ctx.revert();
+    return () => ctx.revert(); // kills all ScrollTriggers created inside ctx
   }, []);
 
   const handleBubbleEnter = (e) => {
@@ -193,7 +197,7 @@ const Contact = () => {
   };
 
   return (
-    <section className="relative w-full overflow-hidden">
+    <section ref={pageRef} className="relative w-full overflow-hidden">
       {/* Banner Wrapper */}
       <div className="relative w-full h-[70vh] sm:h-[75vh] md:h-[80vh] overflow-hidden">
         <img
@@ -237,13 +241,13 @@ const Contact = () => {
         />
       </div>
 
-      <section
-        ref={sectionRef}
-        className="w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-10 lg:py-16"
-      >
+      <section className="w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-10 lg:py-16">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:gap-8">
           {/* Info Cards */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div
+            ref={cardsWrapRef}
+            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {infoCards.map(({ icon: Icon, title, lines }) => (
               <div
                 key={title}
@@ -317,17 +321,11 @@ const Contact = () => {
               ref={formRef}
               className="relative w-full px-6 py-8 sm:px-10 sm:py-10 lg:w-[60%] lg:px-12 lg:py-12"
             >
-              <span
-                ref={addFieldRef}
-                className="inline-block rounded-full bg-[#f3f0e8] px-4 py-1.5 text-xs font-medium tracking-wide text-[#16281c]"
-              >
+              <span className="inline-block rounded-full bg-[#f3f0e8] px-4 py-1.5 text-xs font-medium tracking-wide text-[#16281c]">
                 Get To Contact Us
               </span>
 
-              <h2
-                ref={addFieldRef}
-                className="mt-4 font-serif text-3xl leading-tight text-[#1e3a2b] sm:text-4xl"
-              >
+              <h2 className="mt-4 font-serif text-3xl leading-tight text-[#1e3a2b] sm:text-4xl">
                 Have a any Questions?
                 <br />
                 Get in Touch!
@@ -339,26 +337,22 @@ const Contact = () => {
               >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <input
-                    ref={addFieldRef}
                     type="text"
                     placeholder="First Name"
                     autoFocus
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
                   />
                   <input
-                    ref={addFieldRef}
                     type="text"
                     placeholder="Last Number"
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
                   />
                   <input
-                    ref={addFieldRef}
                     type="email"
                     placeholder="Email Address"
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
                   />
                   <input
-                    ref={addFieldRef}
                     type="tel"
                     placeholder="Phone Number"
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
@@ -366,7 +360,6 @@ const Contact = () => {
                 </div>
 
                 <textarea
-                  ref={addFieldRef}
                   placeholder="Messages"
                   rows={4}
                   className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
@@ -377,7 +370,7 @@ const Contact = () => {
                   type="submit"
                   onMouseEnter={handleButtonEnter}
                   onMouseLeave={handleButtonLeave}
-                  className="mt-1 flex w-fit items-center gap-2 rounded-full bg-[#315537] py-3.5 pl-7 pr-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]"
+                  className="mt-1 cursor-pointer flex w-fit items-center gap-2 rounded-full bg-[#315537] py-3.5 pl-7 pr-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]"
                 >
                   Send Massage
                   <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
@@ -387,11 +380,9 @@ const Contact = () => {
           </div>
         </div>
       </section>
+
       {/* Map Section */}
-      <div
-        // ref={mapRef}
-        className="overflow-hidden shadow-sm"
-      >
+      <div ref={mapRef} className="overflow-hidden shadow-sm">
         {/* Iframe */}
         <div className="relative h-[420px] w-full sm:h-[500px]">
           <iframe

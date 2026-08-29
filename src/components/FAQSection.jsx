@@ -55,33 +55,43 @@ const faqs = [
   },
 ];
 
-/* ── Standalone icon — one SVG, two lines, vertical controlled by GSAP ── */
-function AccordionIcon({ iconRef, hBarRef, vBarRef }) {
+/* ── Icon: two bars, vertical controlled by GSAP ── */
+function AccordionIcon({ iconRef, hBarRef, vBarRef, onClick }) {
   return (
     <span
       ref={iconRef}
-      className="relative flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full"
-      style={{ background: "rgba(255,255,255,0.10)" }}
+      onClick={onClick}
+      className="relative flex flex-shrink-0 items-center justify-center rounded-full"
+      style={{
+        width: 30,
+        height: 30,
+        minWidth: 30,
+        background: "rgba(255,255,255,0.10)",
+      }}
     >
-      {/* Horizontal bar — always visible */}
+      {/* Horizontal bar */}
       <span
         ref={hBarRef}
         className="absolute rounded-full"
         style={{
-          width: 14, height: 2,
+          width: 14,
+          height: 2,
           background: "rgba(255,255,255,0.85)",
-          top: "50%", left: "50%",
+          top: "50%",
+          left: "50%",
           transform: "translate(-50%,-50%)",
         }}
       />
-      {/* Vertical bar — GSAP scales to 0 when open */}
+      {/* Vertical bar — GSAP scaleY → 0 when open */}
       <span
         ref={vBarRef}
         className="absolute rounded-full"
         style={{
-          width: 2, height: 14,
+          width: 2,
+          height: 14,
           background: "rgba(255,255,255,0.85)",
-          top: "50%", left: "50%",
+          top: "50%",
+          left: "50%",
           transform: "translate(-50%,-50%)",
           transformOrigin: "center center",
         }}
@@ -90,7 +100,7 @@ function AccordionIcon({ iconRef, hBarRef, vBarRef }) {
   );
 }
 
-function FAQItem({ faq, index, isOpen, onToggle }) {
+function FAQItem({ faq, index, isOpen, onToggle, initialOpen }) {
   const itemRef     = useRef(null);
   const bodyRef     = useRef(null);
   const cardRef     = useRef(null);
@@ -98,13 +108,30 @@ function FAQItem({ faq, index, isOpen, onToggle }) {
   const iconRef     = useRef(null);
   const hBarRef     = useRef(null);
   const vBarRef     = useRef(null);
-  const heightRef   = useRef(0);
   const rafRef      = useRef(null);
+  const initDone    = useRef(false); // FIX: track first paint
 
   const prefersReduced = () =>
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* ── 1. Scroll reveal ─────────────────────────────────────────── */
+  /* ── 1. Set initial open state synchronously before GSAP touches it ── */
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || initDone.current) return;
+    initDone.current = true;
+
+    if (initialOpen) {
+      // FIX: measure real height and set it directly — no tween on first render
+      gsap.set(body, { height: "auto", opacity: 1 });
+      gsap.set(iconRef.current, { background: "rgba(255,255,255,0.22)" });
+      gsap.set(vBarRef.current, { scaleY: 0 });
+      gsap.set(hBarRef.current, { background: "#ffffff" });
+      gsap.set(cardRef.current, { background: "rgba(255,255,255,0.07)" });
+      gsap.set(questionRef.current, { color: "#ffffff" });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── 2. Scroll reveal ─────────────────────────────────────────── */
   useEffect(() => {
     if (prefersReduced()) return;
     const ctx = gsap.context(() => {
@@ -112,7 +139,8 @@ function FAQItem({ faq, index, isOpen, onToggle }) {
         itemRef.current,
         { opacity: 0, y: 32 },
         {
-          opacity: 1, y: 0,
+          opacity: 1,
+          y: 0,
           duration: 0.6,
           delay: index * 0.06,
           ease: "power3.out",
@@ -127,64 +155,43 @@ function FAQItem({ faq, index, isOpen, onToggle }) {
     return () => ctx.revert();
   }, [index]);
 
-  /* ── 2. Open / close ─────────────────────────────────────────── */
+  /* ── 3. Open / close tween ───────────────────────────────────── */
   useEffect(() => {
     const body = bodyRef.current;
-    if (!body) return;
+    if (!body || !initDone.current) return;
 
     if (isOpen) {
-      /* measure */
+      // FIX: measure height properly
+      const prev = body.style.height;
       gsap.set(body, { height: "auto", opacity: 1 });
       const h = body.offsetHeight;
-      gsap.set(body, { height: 0, opacity: 0 });
-      heightRef.current = h;
+      gsap.set(body, { height: prev || 0, opacity: prev ? 1 : 0 });
 
-      gsap.to(body, { height: h, opacity: 1, duration: 0.46, ease: "power3.out" ,});
+      gsap.to(body, { height: h, opacity: 1, duration: 0.46, ease: "power3.out" });
 
-      /* card background lift */
       gsap.to(cardRef.current, {
         background: "rgba(255,255,255,0.07)",
         duration: 0.3,
       });
-
-      /* question → white */
       gsap.to(questionRef.current, { color: "#ffffff", duration: 0.22 });
-
-      /* icon: circle brighter, vertical bar scales to 0 (→ minus) */
       gsap.to(iconRef.current, {
         background: "rgba(255,255,255,0.22)",
         duration: 0.25,
       });
-      gsap.to(vBarRef.current, {
-        scaleY: 0,
-        duration: 0.28,
-        ease: "power2.inOut",
-      });
-      gsap.to(hBarRef.current, {
-        width: 14,
-        background: "#ffffff",
-        duration: 0.25,
-      });
+      gsap.to(vBarRef.current, { scaleY: 0, duration: 0.28, ease: "power2.inOut" });
+      gsap.to(hBarRef.current, { background: "#ffffff", duration: 0.25 });
     } else {
       gsap.to(body, { height: 0, opacity: 0, duration: 0.35, ease: "power3.in" });
-
       gsap.to(cardRef.current, {
         background: "rgba(255,255,255,0.03)",
         duration: 0.3,
       });
-
       gsap.to(questionRef.current, { color: "#e8ede8", duration: 0.22 });
-
       gsap.to(iconRef.current, {
         background: "rgba(255,255,255,0.10)",
         duration: 0.25,
       });
-      /* bring vertical bar back */
-      gsap.to(vBarRef.current, {
-        scaleY: 1,
-        duration: 0.3,
-        ease: "back.out(2)",
-      });
+      gsap.to(vBarRef.current, { scaleY: 1, duration: 0.3, ease: "back.out(2)" });
       gsap.to(hBarRef.current, {
         background: "rgba(255,255,255,0.85)",
         duration: 0.25,
@@ -192,38 +199,47 @@ function FAQItem({ faq, index, isOpen, onToggle }) {
     }
   }, [isOpen]);
 
-  /* ── 3. Card mouse-move tilt ─────────────────────────────────── */
-  const handleMouseMove = useCallback((e) => {
-    if (prefersReduced()) return;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      const card = cardRef.current;
-      if (!card) return;
-      const { left, top, width, height } = card.getBoundingClientRect();
-      const x = (e.clientX - left) / width  - 0.5;
-      const y = (e.clientY - top)  / height - 0.5;
-      gsap.to(card, {
-        rotateX: -y * 3,
-        rotateY:  x * 5,
-        transformPerspective: 1000,
-        duration: 0.4,
-        ease: "power2.out", 
-        force3D: false,  // ← add this
+  /* ── 4. Card mouse-move tilt ─────────────────────────────────── */
+  const handleMouseMove = useCallback(
+    (e) => {
+      // FIX: skip reduced-motion check before RAF, not inside it
+      if (prefersReduced()) return;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const card = cardRef.current;
+        if (!card) return;
+        const { left, top, width, height } = card.getBoundingClientRect();
+        const x = (e.clientX - left) / width - 0.5;
+        const y = (e.clientY - top) / height - 0.5;
+        gsap.to(card, {
+          rotateX: -y * 3,
+          rotateY: x * 5,
+          transformPerspective: 1000,
+          duration: 0.4,
+          ease: "power2.out",
+          // FIX: removed force3D: false — preserve-3d needs GPU compositing
+        });
       });
-    });     
-  }, []);
+    },
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const handleMouseLeave = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     gsap.to(cardRef.current, {
-      rotateX: 0, rotateY: 0,
+      rotateX: 0,
+      rotateY: 0,
       duration: 0.55,
       ease: "elastic.out(1, 0.5)",
-       force3D: false,  // ← add this
+      // FIX: removed force3D: false
     });
     if (!isOpen) {
       gsap.to(questionRef.current, { color: "#e8ede8", duration: 0.2 });
-      gsap.to(iconRef.current, { background: "rgba(255,255,255,0.10)", scale: 1, duration: 0.2 });
+      gsap.to(iconRef.current, {
+        background: "rgba(255,255,255,0.10)",
+        scale: 1,
+        duration: 0.2,
+      });
     }
   }, [isOpen]);
 
@@ -234,50 +250,56 @@ function FAQItem({ faq, index, isOpen, onToggle }) {
     gsap.to(iconRef.current, { scale: 1.12, duration: 0.2, ease: "back.out(2)" });
   }, [isOpen]);
 
-  /* ── 4. Icon ripple on click ─────────────────────────────────── */
-  const handleIconClick = useCallback((e) => {
-    e.stopPropagation();
-    const el = iconRef.current;
-    if (!el) return;
-    const ripple = document.createElement("span");
-    ripple.style.cssText = `
-      position:absolute;inset:0;border-radius:50%;
-      background:rgba(255,255,255,0.3);
-      transform:scale(0.4);pointer-events:none;
-    `;
-    el.style.position = "relative";
-    el.appendChild(ripple);
-    gsap.to(ripple, {
-      scale: 2.2, opacity: 0, duration: 0.5, ease: "power2.out",
-      onComplete: () => ripple.remove(),
-    });
-    onToggle();
-  }, [onToggle]);
+  /* ── 5. Icon ripple on click ─────────────────────────────────── */
+  const handleIconClick = useCallback(
+    (e) => {
+      e.stopPropagation();
+      const el = iconRef.current;
+      if (!el) return;
+      const ripple = document.createElement("span");
+      ripple.style.cssText = `
+        position:absolute;inset:0;border-radius:50%;
+        background:rgba(255,255,255,0.3);
+        transform:scale(0.4);pointer-events:none;
+      `;
+      el.appendChild(ripple);
+      gsap.to(ripple, {
+        scale: 2.2,
+        opacity: 0,
+        duration: 0.5,
+        ease: "power2.out",
+        onComplete: () => ripple.remove(),
+      });
+      onToggle();
+    },
+    [onToggle]
+  );
 
   return (
-    <div
-      ref={itemRef}
-      className="w-full"
-      style={{ opacity: 0 }}
-    >
+    <div ref={itemRef} className="w-full" style={{ opacity: 0 }}>
       <div
         ref={cardRef}
         className="w-full cursor-pointer"
         style={{
           borderRadius: 16,
           background: "rgba(255,255,255,0.03)",
-          padding: "0 24px",
+          // FIX: px on container, not inner — avoids tilt bleeding into siblings
+          padding: "0 20px",
+          // FIX: isolate stacking context so 3D card doesn't bleed over adjacent cards
+          isolation: "isolate",
           transformStyle: "preserve-3d",
           willChange: "transform",
         }}
-      
         onClick={onToggle}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Question row */}
-        <div className="flex w-full items-center justify-between gap-4 py-[22px]">
+        <div className="flex w-full items-center justify-between gap-3 py-5 sm:gap-4 sm:py-[22px]">
           <span
             ref={questionRef}
-            className="text-sm font-normal leading-snug sm:text-[15px]"
+            className="text-[13px] font-normal leading-snug sm:text-[15px]"
             style={{ color: "#e8ede8" }}
           >
             {faq.question}
@@ -287,13 +309,15 @@ function FAQItem({ faq, index, isOpen, onToggle }) {
             iconRef={iconRef}
             hBarRef={hBarRef}
             vBarRef={vBarRef}
+            onClick={handleIconClick}
           />
         </div>
 
-        {/* Answer — GSAP height tween */}
-        <div ref={bodyRef} style={{ height: 0, opacity: 0 }}>
+        {/* Answer — GSAP height tween, overflow hidden prevents leak */}
+        {/* FIX: overflow:hidden is critical for height tween to clip content */}
+        <div ref={bodyRef} style={{ height: 0, opacity: 0, overflow: "hidden" }}>
           <p
-            className="pb-6 text-sm leading-relaxed"
+            className="pb-5 text-[13px] leading-relaxed sm:pb-6 sm:text-sm"
             style={{ color: "rgba(255,255,255,0.60)" }}
           >
             {faq.answer}
@@ -305,9 +329,9 @@ function FAQItem({ faq, index, isOpen, onToggle }) {
 }
 
 export default function FAQSection() {
-  const [openId, setOpenId] = useState(1);
-  const sectionRef          = useRef(null);
-  const headingRef          = useRef(null);
+  const [openId, setOpenId]   = useState(1);
+  const sectionRef             = useRef(null);
+  const headingRef             = useRef(null);
 
   const toggle = useCallback((id) => {
     setOpenId((prev) => (prev === id ? null : id));
@@ -321,8 +345,11 @@ export default function FAQSection() {
         headingRef.current,
         { opacity: 0, y: -20, letterSpacing: "0.35em" },
         {
-          opacity: 1, y: 0, letterSpacing: "0.08em",
-          duration: 0.75, ease: "power3.out",
+          opacity: 1,
+          y: 0,
+          letterSpacing: "0.08em",
+          duration: 0.75,
+          ease: "power3.out",
           scrollTrigger: {
             trigger: headingRef.current,
             start: "top 88%",
@@ -335,10 +362,7 @@ export default function FAQSection() {
   }, []);
 
   return (
-    <section
-      ref={sectionRef}
-      className="w-full mb-14 "
-    >
+    <section ref={sectionRef} className="w-full mb-14">
       {/* Heading */}
       <h2
         ref={headingRef}
@@ -361,6 +385,7 @@ export default function FAQSection() {
             faq={faq}
             index={i}
             isOpen={openId === faq.id}
+            initialOpen={faq.id === 1} // FIX: pass initialOpen for flash-free first render
             onToggle={() => toggle(faq.id)}
           />
         ))}

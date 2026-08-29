@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const DATA = [
   "fcx0LV7C2pE",
@@ -32,7 +32,9 @@ export default function Carousel3D() {
   const [playingIndex, setPlayingIndex] = useState(null);
   const [screenType, setScreenType] = useState(getScreenType);
   const [centerIndex, setCenterIndex] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
   const cardRefs = useRef([]);
+  const sceneRef = useRef(null);
 
   useEffect(() => {
     const onResize = () => setScreenType(getScreenType());
@@ -40,12 +42,32 @@ export default function Carousel3D() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Only run the centered-card detection (and the ring rotation, see CSS
+  // below) while the carousel is actually on screen. Previously this loop
+  // ran unconditionally forever, forcing 6 layout reads every ~100ms even
+  // while scrolled far away — that constant main-thread work compounded
+  // with the CSS 3D rotation's paint cost and was measurably dropping
+  // frame rate (and, on slower machines, making scroll feel like it had
+  // stalled) specifically while this section was in view.
   useEffect(() => {
+    const node = sceneRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { rootMargin: "200px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
+
     let rafId;
     let lastCheck = 0;
 
     const loop = (time) => {
-      if (time - lastCheck > 100) {
+      if (time - lastCheck > 300) {
         lastCheck = time;
         let maxWidth = -Infinity;
         let maxIdx = null;
@@ -68,7 +90,7 @@ export default function Carousel3D() {
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [isVisible]);
 
   const mobile = screenType === "mobile";
   const laptop = screenType === "laptop";
@@ -120,7 +142,7 @@ export default function Carousel3D() {
           place-self: center;
           transform-style: preserve-3d;
           animation: rotateRing 28s linear infinite;
-          animation-play-state: ${paused ? "paused" : "running"};
+          animation-play-state: ${paused || !isVisible ? "paused" : "running"};
           position: relative;
           z-index: 1;
           /* Disable the huge transformed hitbox — cards re-enable individually */
@@ -225,7 +247,7 @@ export default function Carousel3D() {
         }
       `}</style>
 
-      <div className="c3d-scene">
+      <div className="c3d-scene" ref={sceneRef}>
         {/* Background layer handles pause/resume — avoids relying on
             the giant transformed bounding box of c3d-a3d as event target */}
         <div

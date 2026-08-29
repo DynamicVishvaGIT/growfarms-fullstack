@@ -27,7 +27,7 @@ body {
   min-height: 100dvh;
   overflow-x: hidden;
   background: var(--page-bg);
-   font-family: "Libre Baskerville", serif;
+  font-family: "Libre Baskerville", serif;
 }
 
 .sub_font{

@@ -1,6 +1,6 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import gsap from "gsap";
-import { ChevronLeft, ChevronRight, Sprout, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import pali_img_1 from "../assets/images/Why_Pali_1.png";
 import pali_img_2 from "../assets/images/Why_Pali_2.png";
 import pali_img_3 from "../assets/images/Why_Pali_3.png";
@@ -338,7 +338,6 @@ export default function WhyPaliSection() {
         {SLIDES.map((slide, i) => {
           const offset = getOffset(i);
           const abs = Math.abs(offset);
-          const isActive = offset === 0;
           const isAdjacent = abs === 1;
           const isHoveredAdjacent = isAdjacent && hoveredIndex === i;
 

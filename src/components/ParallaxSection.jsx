@@ -1,4 +1,3 @@
-import React from 'react'
 import { useEffect, useRef } from "react";
 import home_banner_3 from "../assets/images/home_banner_3.jpg";
 import green_bottom_img from "../assets/images/green_img.png";

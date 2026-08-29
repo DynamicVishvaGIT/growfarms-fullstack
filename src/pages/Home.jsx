@@ -1,10 +1,6 @@
-import home_banner_2 from "../assets/images/home_banner_2.jpg";
-import { useEffect, useRef, useState } from "react";
 import AerialMapSection from "../components/AerialMapSection";
 import HomeBanner from "../components/HomeBanner";
-import logo_img from "../assets/images/grow-farms-logo.png";
 import ParallaxSection from "../components/ParallaxSection";
-import FooterSection from "../components/FooterSection";
 import TestimonialSection from "../components/TestimonialSection";
 
 const GrowFarmsHero = () => {
@@ -32,9 +28,6 @@ const GrowFarmsHero = () => {
      ══════════════════════════════════════ */}
       <ParallaxSection />
 
-      {/* ══════════════════════════════════════
-          FOOTER
-      ══════════════════════════════════════ */}
    
     </div>
   );

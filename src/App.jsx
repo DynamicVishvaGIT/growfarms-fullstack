@@ -16,17 +16,18 @@ import Contact from "./pages/Contact";
 import Details from "./pages/Details";
 
 import FooterSection from "./components/FooterSection";
+import BlogDetails from "./components/BlogDetails";
 
 const App = () => {
 
   const [loading,setLoading] = useState(true);
 
-  useSmoothScroll();
+  // useSmoothScroll();
 
-  ScrollRefresh();
-  
   return (
     <>
+      <ScrollRefresh />
+
       <PageLoader
         loading={loading}
         onDone={()=>{
@@ -62,6 +63,8 @@ const App = () => {
           <Route path="/contact" element={<Contact/>}/>
 
           <Route path="/details" element={<Details/>}/>
+
+          <Route path="/blog-details" element={<BlogDetails/>}/>
 
         </Routes>
 

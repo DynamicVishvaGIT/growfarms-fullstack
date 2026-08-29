@@ -383,7 +383,7 @@ export default function HowToBuyFarmLand() {
     <section
       ref={sectionRef}
       className="relative w-full"
-      style={{padding: '56px 20px 130px' }}
+      style={{padding: '56px 20px 80px' }}
     >
       {/* ── Header ── */}
       <div className="relative z-10 mx-auto max-w-lg text-center">
