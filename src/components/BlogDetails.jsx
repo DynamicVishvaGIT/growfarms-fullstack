@@ -142,6 +142,26 @@ const BlogDetails = () => {
 
     if (prefersReducedMotion) return;
 
+    // FIX 1: reset scroll to top on mount. When this page is reached via
+    // client-side navigation (React Router push), the browser can retain the
+    // previous page's scroll position for a frame. ScrollTrigger reads scroll
+    // position at creation time, so a stale position causes it to compute the
+    // wrong trigger point on the *first* render — this is the #1 reason the
+    // "works on localhost, breaks in production" symptom shows up (dev's hot
+    // reload always starts at scroll 0, a real user's route change doesn't).
+    window.scrollTo(0, 0);
+
+    // Collect every section we animate so the safety-net fallback (FIX 3)
+    // can force them visible if something upstream still goes wrong.
+    const revealTargets = [
+      detailsRef.current,
+      imgsRef.current,
+      growRef.current,
+      stepsWrapRef.current,
+      quoteRef.current,
+      otherBlogRef.current,
+    ].filter(Boolean);
+
     const ctx = gsap.context(() => {
       const mm = gsap.matchMedia();
 
@@ -155,9 +175,12 @@ const BlogDetails = () => {
           const travel = isMobile ? 24 : 40;
           const dur = isMobile ? 0.6 : 0.9;
 
-          // Shared helper — always fromTo so final state is explicit
-          // (identical to the reveal() helper in About.jsx)
-          const reveal = (el, extraFrom = {}, extraTo = {}, startPos = "top 88%") => {
+          // Shared helper — always fromTo so final state is explicit.
+          // FIX 2: start is now "top 95%" instead of "top 88%". A later
+          // start point means the element only needs to be barely inside the
+          // viewport to fire, which makes the trigger far more tolerant of
+          // small layout/measurement differences between dev and prod.
+          const reveal = (el, extraFrom = {}, extraTo = {}, startPos = "top 95%") => {
             if (!el) return;
             gsap.fromTo(
               el,
@@ -213,8 +236,18 @@ const BlogDetails = () => {
           };
           window.addEventListener("resize", onResize);
 
+          // FIX 3: extra refresh once the *entire* window (fonts, all
+          // network requests, everything) has finished loading. Production
+          // servers/CDNs are almost always slower than a local dev server,
+          // so fonts swapping in or late-loading assets can shift layout
+          // after our image-based refresh already ran. This second refresh
+          // catches that.
+          const onWindowLoad = () => ScrollTrigger.refresh();
+          window.addEventListener("load", onWindowLoad);
+
           return () => {
             window.removeEventListener("resize", onResize);
+            window.removeEventListener("load", onWindowLoad);
             clearTimeout(resizeTimer);
             images.forEach((img) => {
               img.removeEventListener("load", onImageLoad);
@@ -225,7 +258,25 @@ const BlogDetails = () => {
       );
     }, pageRef);
 
-    return () => ctx.revert(); // kills all ScrollTriggers created inside ctx
+    // FIX 4 (safety net): if for any reason a section never received its
+    // ScrollTrigger-driven "to" state within 2.5s (blocked JS chunk, a
+    // failed dynamic import, matchMedia edge case, etc.), force it to its
+    // final visible state directly. This guarantees content can never be
+    // permanently stuck invisible in production, even if the root cause
+    // above isn't the only one at play.
+    const safetyTimer = setTimeout(() => {
+      revealTargets.forEach((el) => {
+        const computed = window.getComputedStyle(el);
+        if (parseFloat(computed.opacity) < 1) {
+          gsap.set(el, { opacity: 1, y: 0, scale: 1, clearProps: "transform" });
+        }
+      });
+    }, 2500);
+
+    return () => {
+      clearTimeout(safetyTimer);
+      ctx.revert(); // kills all ScrollTriggers created inside ctx
+    };
   }, []);
 
   return (
@@ -379,7 +430,7 @@ const BlogDetails = () => {
       </section>
 
       {/* ---------------- DETAILS SECTION ---------------- */}
-      <section className="relative bg-[#315537] text-[#EDE7D9] px-5 sm:px-10 lg:px-16 pt-14 sm:pt-20 lg:pt-24 pb-16 sm:pb-20 lg:pb-40">
+      <section className="relative bg-[#315537] text-[#EDE7D9] px-5 sm:px-10 lg:px-16 pt-14 sm:pt-20 lg:pt-8 pb-16 sm:pb-20 lg:pb-40">
         <div className="relative max-w-6xl mx-auto">
           {/* Intro text block */}
           <div ref={detailsRef}>
@@ -387,7 +438,7 @@ const BlogDetails = () => {
               Better Agriculture for Better Future
             </h1>
 
-            <div className="mt-5 space-y-4 max-w-3xl lg:max-w-4xl text-[#D8CFBB] text-[14px] sm:text-[15px] lg:text-base leading-relaxed">
+            <div className="mt-5 space-y-4 max-w-3xl lg:max-w-6xl text-[#D8CFBB] text-[14px] sm:text-[15px] lg:text-base leading-relaxed">
               <p>
                 At Grow Farms, we believe that owning agricultural land is more than an
                 investment&mdash;it&rsquo;s a step toward a healthier, more peaceful
@@ -434,7 +485,7 @@ const BlogDetails = () => {
               Everything on our farm is grown
             </h2>
 
-            <p className="mt-4 text-[#D8CFBB] text-[14px] sm:text-[15px] leading-relaxed max-w-3xl">
+            <p className="mt-4 text-[#D8CFBB] text-[14px] sm:text-[15px] leading-relaxed max-w-5xl">
               They offer adaptability, high nutritional value, and can yield higher
               yields with minimal agronomic inputs, and provide{" "}
               <span className="text-[#C7DDB5] underline decoration-[#C7DDB5]/50 underline-offset-2">
@@ -483,7 +534,7 @@ const BlogDetails = () => {
           ref={quoteRef}
           className="
             relative
-            lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:-bottom-16
+            lg:absolute lg:inset-x-0 lg:-bottom-16
             mt-10 sm:mt-14 lg:mt-0
             w-full lg:w-[90%]
             max-w-full sm:max-w-2xl lg:max-w-5xl
