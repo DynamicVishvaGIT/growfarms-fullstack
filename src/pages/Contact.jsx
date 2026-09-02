@@ -1,14 +1,71 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import ContactBanner from "../assets/images/Contact_banner.png";
 import logo_img from "../assets/images/grow-farms-logo.png";
 import CardVector from "../assets/images/Vector__4_.png";
 import contectSideimg from "../assets/images/Contact.jpg";
 
-import { Mail, Phone, MapPin, ArrowUpRight } from "lucide-react";
+import { Mail, Phone, MapPin, ArrowUpRight, Check } from "lucide-react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import {
+  validateName,
+  validateEmail,
+  validatePhone,
+  validateMessage,
+  compactErrors,
+  fieldClass,
+} from "../lib/validation";
 
 gsap.registerPlugin(ScrollTrigger);
+
+const EMPTY_FORM = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  message: "",
+};
+
+// Order matters: used to focus the first invalid field on submit.
+const FIELD_ORDER = ["firstName", "lastName", "email", "phone", "message"];
+
+function validateField(field, values) {
+  switch (field) {
+    case "firstName":
+      return validateName(values.firstName, "first name");
+    case "lastName":
+      return validateName(values.lastName, "last name");
+    case "email":
+      return validateEmail(values.email);
+    case "phone":
+      return validatePhone(values.phone);
+    case "message":
+      return validateMessage(values.message, { required: true, min: 10 });
+    default:
+      return "";
+  }
+}
+
+function Field({ as: Tag = "input", error, name, className = "", ...props }) {
+  const id = `contact-${name}`;
+  return (
+    <div className={className}>
+      <Tag
+        id={id}
+        name={name}
+        aria-invalid={error ? "true" : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={fieldClass(!!error, Tag === "textarea" ? "resize-none" : "")}
+        {...props}
+      />
+      {error && (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-red-600">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 const infoCards = [
   {
@@ -44,8 +101,14 @@ const Contact = () => {
   // Kept for the floating arrow-bubble query below (not used for stagger reveal)
   const cardRefs = useRef([]);
   const buttonRef = useRef(null);
+  const formElRef = useRef(null); // the <form> element itself, for validation UX
   cardRefs.current = [];
   const addCardRef = (el) => el && cardRefs.current.push(el);
+
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [sent, setSent] = useState(false);
 
   /* ---------- GSAP ScrollTrigger — About.jsx-style section reveals ---------- */
   useLayoutEffect(() => {
@@ -187,13 +250,57 @@ const Contact = () => {
     });
   };
 
+  /* ---------- Form state + validation ---------- */
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    const next = { ...form, [name]: value };
+    setForm(next);
+    if (sent) setSent(false);
+
+    // Only re-validate live once the field has been visited, so the user is
+    // not scolded mid-keystroke on their first pass through the form.
+    if (touched[name]) {
+      setErrors((prev) => ({ ...prev, [name]: validateField(name, next) }));
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    setErrors((prev) => ({ ...prev, [name]: validateField(name, form) }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    const next = compactErrors(
+      Object.fromEntries(FIELD_ORDER.map((f) => [f, validateField(f, form)])),
+    );
+
+    setErrors(next);
+    setTouched(Object.fromEntries(FIELD_ORDER.map((f) => [f, true])));
+
+    if (Object.keys(next).length) {
+      gsap.fromTo(
+        formElRef.current,
+        { x: -8 },
+        { x: 0, duration: 0.45, ease: "elastic.out(1, 0.35)" },
+      );
+      const firstBad = FIELD_ORDER.find((f) => next[f]);
+      formElRef.current?.querySelector(`[name="${firstBad}"]`)?.focus();
+      return;
+    }
+
     gsap.fromTo(
       buttonRef.current,
       { scale: 0.94 },
       { scale: 1, duration: 0.4, ease: "elastic.out(1, 0.4)" },
     );
+
+    // TODO: post to the real contact endpoint once it exists.
+    setSent(true);
+    setForm(EMPTY_FORM);
+    setTouched({});
   };
 
   return (
@@ -332,37 +439,69 @@ const Contact = () => {
               </h2>
 
               <form
+                ref={formElRef}
                 onSubmit={handleSubmit}
                 className="relative mt-7 flex flex-col gap-4"
+                noValidate
               >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <input
+                  <Field
                     type="text"
+                    name="firstName"
+                    value={form.firstName}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={errors.firstName}
                     placeholder="First Name"
+                    autoComplete="given-name"
                     autoFocus
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
+                    maxLength={60}
                   />
-                  <input
+                  <Field
                     type="text"
-                    placeholder="Last Number"
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
+                    name="lastName"
+                    value={form.lastName}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={errors.lastName}
+                    placeholder="Last Name"
+                    autoComplete="family-name"
+                    maxLength={60}
                   />
-                  <input
+                  <Field
                     type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={errors.email}
                     placeholder="Email Address"
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
+                    autoComplete="email"
+                    maxLength={254}
                   />
-                  <input
+                  <Field
                     type="tel"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    error={errors.phone}
                     placeholder="Phone Number"
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
+                    autoComplete="tel"
+                    maxLength={20}
                   />
                 </div>
 
-                <textarea
+                <Field
+                  as="textarea"
+                  name="message"
+                  value={form.message}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  error={errors.message}
                   placeholder="Messages"
                   rows={4}
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#1e3a2b] transition"
+                  maxLength={1000}
                 />
 
                 <button
@@ -372,9 +511,19 @@ const Contact = () => {
                   onMouseLeave={handleButtonLeave}
                   className="mt-1 cursor-pointer flex w-fit items-center gap-2 rounded-full bg-[#315537] py-3.5 pl-7 pr-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]"
                 >
-                  Send Massage
+                  Send Message
                   <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
                 </button>
+
+                {sent && (
+                  <p
+                    role="status"
+                    className="flex items-center gap-2 text-sm font-medium text-[#315537]"
+                  >
+                    <Check className="h-4 w-4" strokeWidth={3} />
+                    Thanks! Your message has been sent — we will be in touch shortly.
+                  </p>
+                )}
               </form>
             </div>
           </div>

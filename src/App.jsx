@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import ExploreButton from "./components/ExploreButton";
 import ScrollRefresh from "./components/ScrollRefresh";
 import PageLoader from "./components/PageLoader";
+import RouteTransition from "./components/RouteTransition";
 
 import useSmoothScroll from "./hooks/useSmoothScroll";
 
@@ -19,8 +20,9 @@ import FooterSection from "./components/FooterSection";
 import BlogDetails from "./components/BlogDetails";
 
 const App = () => {
-
-  const [loading,setLoading] = useState(true);
+  // `revealed` flips as the loader panels start splitting — the page has to be
+  // painted by then, because it is what the split reveals.
+  const [revealed, setRevealed] = useState(false);
 
   // useSmoothScroll();
 
@@ -29,53 +31,45 @@ const App = () => {
       <ScrollRefresh />
 
       <PageLoader
-        loading={loading}
-        onDone={()=>{
-          setLoading(false);
-
-          setTimeout(()=>{
-            ScrollTrigger.refresh();
-          },100);
-
+        onReveal={() => {
+          setRevealed(true);
+          ScrollTrigger.refresh();
         }}
-        duration={2800}
+        onDone={() => {
+          ScrollTrigger.refresh();
+        }}
+        minDuration={2000}
       />
 
+      <RouteTransition />
 
       <main
         style={{
-          visibility: loading ? "hidden":"visible"
+          visibility: revealed ? "visible" : "hidden",
         }}
       >
-
         <ExploreButton />
 
         <Routes>
+          <Route path="/" element={<Home />} />
 
-          <Route path="/" element={<Home/>}/>
+          <Route path="/about" element={<About />} />
 
-          <Route path="/about" element={<About/>}/>
+          <Route path="/blogs" element={<Blogs />} />
 
-          <Route path="/blogs" element={<Blogs/>}/>
+          <Route path="/testimonials" element={<Testimonials />} />
 
-          <Route path="/testimonials" element={<Testimonials/>}/>
+          <Route path="/contact" element={<Contact />} />
 
-          <Route path="/contact" element={<Contact/>}/>
+          <Route path="/details" element={<Details />} />
 
-          <Route path="/details" element={<Details/>}/>
-
-          <Route path="/blog-details" element={<BlogDetails/>}/>
-
+          <Route path="/blog-details" element={<BlogDetails />} />
         </Routes>
 
-
         <FooterSection />
-
       </main>
-
     </>
   );
 };
-
 
 export default App;

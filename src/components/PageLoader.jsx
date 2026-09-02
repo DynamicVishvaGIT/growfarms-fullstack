@@ -1,243 +1,327 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { gsap } from "gsap";
 import logo from "/logo_1.png";
 
 // ─────────────────────────────────────────────────────────────
-// Usage in App.jsx / main entry:
+// Split-panel page loader.
 //
-//   import PageLoader from "./components/PageLoader";
-//
-//   const App = () => {
-//     const [loading, setLoading] = useState(true);
-//     return (
-//       <>
-//         <PageLoader loading={loading} onDone={() => setLoading(false)} />
-//         {!loading && <YourApp />}
-//       </>
-//     );
-//   };
+// The intro draws a ring around the mark while a counter tracks
+// real asset progress; the exit un-draws the ring, wipes the
+// accent lines vertically, then splits the two panels apart to
+// reveal the page underneath.
 //
 // Props:
-//   loading  : boolean  — show/hide the loader
-//   onDone   : fn       — called after the exit animation finishes
-//   duration : number   — ms to auto-dismiss (default 2800)
+//   loading     : boolean — show/hide the loader
+//   onReveal    : fn      — fired as the panels start splitting.
+//                           The page must be visible by then, since
+//                           it is what the split reveals.
+//   onDone      : fn      — fired once the loader has fully left.
+//   minDuration : ms      — floor, so the intro is always seen (default 2000)
+//   maxDuration : ms      — ceiling, in case an asset never resolves (default 7000)
 // ─────────────────────────────────────────────────────────────
 
-const PageLoader = ({ loading = true, onDone, duration = 2800 }) => {
-  const [phase, setPhase] = useState("enter"); // enter | hold | exit | gone
+const PANEL_BG = "#163f1f"; // matches HomeBanner/AerialMapSection, so the seam is invisible
+const ACCENT = "#a3c96e";
 
+const PageLoader = ({
+  loading = true,
+  onReveal,
+  onDone,
+  minDuration = 2000,
+  maxDuration = 7000,
+}) => {
+  const [gone, setGone] = useState(false);
+
+  const rootRef = useRef(null);
+  const circleRef = useRef(null);
+  const counterRef = useRef(null);
+
+  // Keep the callbacks in a ref so the timeline effect never re-runs on an
+  // inline-arrow prop identity change (which would restart the loader).
+  const cbRef = useRef({ onReveal, onDone });
   useEffect(() => {
+    cbRef.current = { onReveal, onDone };
+  });
+
+  useLayoutEffect(() => {
     if (!loading) return;
 
-    // 1. Enter phase — runs CSS in animation (600ms)
-    const holdTimer = setTimeout(() => setPhase("hold"), 600);
+    const root = rootRef.current;
+    const circle = circleRef.current;
+    const counterEl = counterRef.current;
+    let ticker = null;
 
-    // 2. Start exit after duration
-    const exitTimer = setTimeout(() => setPhase("exit"), duration);
+    const ctx = gsap.context(() => {
+      const len = circle.getTotalLength();
+      gsap.set(circle, { strokeDasharray: len, strokeDashoffset: len });
 
-    // 3. Unmount after exit animation (500ms)
-    const goneTimer = setTimeout(() => {
-      setPhase("gone");
-      onDone?.();
-    }, duration + 500);
+      // ── Intro ──────────────────────────────────────────────────────────
+      gsap
+        .timeline()
+        .fromTo(
+          root.querySelectorAll("[data-fade]"),
+          { opacity: 0, y: 16 },
+          { opacity: 1, y: 0, duration: 0.9, ease: "power3.out", stagger: 0.09 },
+        )
+        .to(circle, { strokeDashoffset: 0, duration: 1.6, ease: "power2.inOut" }, 0.1);
+
+      // ── Progress ───────────────────────────────────────────────────────
+      // `target` is the real figure (share of images decoded); `shown`
+      // chases it so the number always moves smoothly instead of jumping.
+      const startedAt = performance.now();
+      const state = { shown: 0 };
+      let target = 0;
+      let pageLoaded = document.readyState === "complete";
+
+      const onWindowLoad = () => (pageLoaded = true);
+      window.addEventListener("load", onWindowLoad);
+
+      let exited = false;
+      const runExit = () => {
+        if (exited) return;
+        exited = true;
+        gsap.ticker.remove(ticker);
+        buildExit();
+      };
+
+      ticker = () => {
+        const images = Array.from(document.images);
+        const decoded = images.filter((img) => img.complete).length;
+        const assetPct = images.length ? decoded / images.length : 1;
+        const elapsed = performance.now() - startedAt;
+
+        // Pace against both real asset progress and elapsed time, and take
+        // whichever is further behind — so a warm cache still gets a readable
+        // ramp instead of snapping to 96 in three frames.
+        const timePct = Math.min(1, elapsed / minDuration);
+        const ready = pageLoaded && elapsed >= minDuration;
+
+        let next = ready ? 100 : Math.min(assetPct, timePct) * 96;
+        if (elapsed >= maxDuration) next = 100;
+
+        // Images mount progressively, so the raw share can dip. Never go back.
+        target = Math.max(target, next);
+
+        state.shown += (target - state.shown) * 0.09;
+        const v = Math.min(100, Math.round(state.shown + 0.4));
+        if (counterEl) counterEl.textContent = String(v).padStart(3, "0");
+
+        if (target === 100 && v >= 100) runExit();
+      };
+      gsap.ticker.add(ticker);
+
+      // ── Exit ───────────────────────────────────────────────────────────
+      function buildExit() {
+        const panels = root.querySelectorAll("[data-panel]");
+        const panelLines = root.querySelectorAll("[data-panel-line]");
+        const midLines = root.querySelectorAll("[data-line-mid]");
+
+        gsap
+          .timeline({
+            onComplete: () => {
+              cbRef.current.onDone?.();
+              setGone(true);
+            },
+          })
+          // ring un-draws
+          .to(circle, { strokeDashoffset: len, duration: 1.2, ease: "expo.inOut" })
+          // accent lines wipe vertically, in opposite directions
+          .to(
+            panelLines,
+            {
+              yPercent: gsap.utils.wrap([100, -100]),
+              duration: 1.3,
+              ease: "expo.inOut",
+              stagger: 0.1,
+            },
+            "<",
+          )
+          .to(
+            midLines,
+            {
+              yPercent: gsap.utils.wrap([-100, 100]),
+              duration: 1.5,
+              ease: "power4.inOut",
+              stagger: 0.1,
+            },
+            "<",
+          )
+          // mark + counter fade out
+          .to(
+            root.querySelectorAll("[data-fade]"),
+            { opacity: 0, duration: 0.45, ease: "sine.out" },
+            "<+0.55",
+          )
+          // …and the panels split apart to reveal the page
+          .to(
+            panels,
+            {
+              xPercent: gsap.utils.wrap([-100, 100]),
+              duration: 1.4,
+              ease: "expo.inOut",
+              onStart: () => cbRef.current.onReveal?.(),
+            },
+            ">-0.15",
+          );
+      }
+
+      return () => window.removeEventListener("load", onWindowLoad);
+    }, rootRef);
 
     return () => {
-      clearTimeout(holdTimer);
-      clearTimeout(exitTimer);
-      clearTimeout(goneTimer);
+      if (ticker) gsap.ticker.remove(ticker);
+      ctx.revert();
     };
-  }, [loading, duration, onDone]);
+  }, [loading, minDuration, maxDuration]);
 
-  if (phase === "gone") return null;
+  if (gone) return null;
 
   return (
     <>
       <style>{`
-        @keyframes pl-fadein {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes pl-fadeout {
-          from { opacity: 1; transform: scale(1); }
-          to   { opacity: 0; transform: scale(1.04); }
-        }
-        @keyframes pl-ping-1 {
-          0%   { transform: scale(1);    opacity: 0.7; }
-          100% { transform: scale(2.2);  opacity: 0;   }
-        }
-        @keyframes pl-ping-2 {
-          0%   { transform: scale(1);    opacity: 0.45; }
-          100% { transform: scale(2.8);  opacity: 0;    }
-        }
-        @keyframes pl-ping-3 {
-          0%   { transform: scale(1);    opacity: 0.25; }
-          100% { transform: scale(3.4);  opacity: 0;    }
-        }
-        @keyframes pl-progress {
-          0%   { width: 0%; }
-          60%  { width: 75%; }
-          85%  { width: 90%; }
-          100% { width: 100%; }
-        }
-        @keyframes pl-label-in {
-          from { opacity: 0; letter-spacing: 0.3em; }
-          to   { opacity: 1; letter-spacing: 0.14em; }
-        }
-        @keyframes pl-dot {
-          0%, 80%, 100% { opacity: 0.2; transform: scaleY(0.6); }
-          40%            { opacity: 1;   transform: scaleY(1); }
-        }
-
-        .pl-overlay {
+        .gf-loader {
           position: fixed;
           inset: 0;
           z-index: 9999;
           display: flex;
+          overflow: hidden;
+          pointer-events: auto;
+        }
+        .gf-panel {
+          position: relative;
+          width: 50%;
+          height: 100%;
+          background: ${PANEL_BG};
+        }
+        /* Inner column carrying the thick accent line, 15% in from each edge */
+        .gf-panel-inner {
+          position: absolute;
+          top: 0;
+          width: 15%;
+          height: 100%;
+        }
+        .gf-panel-inner.is-l { left: 0; }
+        .gf-panel-inner.is-r { right: 0; }
+
+        .gf-line { position: absolute; top: 0; height: 100%; }
+        .gf-line.is-thick { width: 3px; background: ${ACCENT}; opacity: 0.5; }
+        .gf-line.is-hair  { width: 1px; background: rgba(255,255,255,0.22); }
+        .gf-line.at-r { right: 0; }
+        .gf-line.at-l { left: 0; }
+
+        .gf-center {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(160deg, #0e2a14 0%, #163f1f 55%, #0a1f0d 100%);
-          animation: pl-fadein 0.4s ease forwards;
+          pointer-events: none;
         }
-        .pl-overlay.exit {
-          animation: pl-fadeout 0.5s ease forwards;
-        }
-
-        /* ── Ripple rings ── */
-        .pl-ring {
+        .gf-mark { position: relative; width: clamp(96px, 13vw, 150px); aspect-ratio: 1; }
+        .gf-mark svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .gf-mark img {
           position: absolute;
-          border-radius: 50%;
-          border: 1.5px solid rgba(255,255,255,0.18);
-          width: 100%;
-          height: 100%;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 42%;
+          object-fit: contain;
         }
-        .pl-ring-1 { animation: pl-ping-1 2.4s ease-out infinite; }
-        .pl-ring-2 { animation: pl-ping-2 2.4s ease-out infinite 0.5s; }
-        .pl-ring-3 { animation: pl-ping-3 2.4s ease-out infinite 1s; }
-
-        /* ── Glass button ── */
-        .pl-glass-outer {
-          position: relative;
-          width: 72px;
-          height: 72px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255,255,255,0.12);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1.5px solid rgba(255,255,255,0.22);
-        }
-        .pl-logo-ring {
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: inset 0 2px 8px rgba(0,0,0,0.12);
-        }
-
-        /* ── Label ── */
-        .pl-label {
-          margin-top: 1.25rem;
-          color: #ffffff;
-          font-size: 1rem;
-          font-weight: 400;
-          letter-spacing: 0.14em;
-          text-shadow: 0 2px 12px rgba(0,0,0,0.3);
-          user-select: none;
-          animation: pl-label-in 0.8s ease 0.3s both;
-          font-family: inherit;
-        }
-
-        /* ── Loading dots ── */
-        .pl-dots {
-          display: flex;
-          gap: 5px;
-          margin-top: 0.5rem;
-        }
-        .pl-dot {
-          width: 4px;
-          height: 14px;
-          border-radius: 2px;
-          background: rgba(163,201,110,0.85);
-          animation: pl-dot 1.2s ease-in-out infinite;
-        }
-        .pl-dot:nth-child(1) { animation-delay: 0s; }
-        .pl-dot:nth-child(2) { animation-delay: 0.15s; }
-        .pl-dot:nth-child(3) { animation-delay: 0.3s; }
-        .pl-dot:nth-child(4) { animation-delay: 0.45s; }
-        .pl-dot:nth-child(5) { animation-delay: 0.6s; }
-
-        /* ── Progress bar ── */
-        .pl-bar-track {
-          position: absolute;
-          bottom: 2.5rem;
-          left: 50%;
-          transform: translateX(-50%);
-          width: clamp(140px, 30vw, 200px);
-          height: 2px;
-          background: rgba(255,255,255,0.12);
-          border-radius: 2px;
-          overflow: hidden;
-        }
-        .pl-bar-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #a3c96e, #5dca90);
-          border-radius: 2px;
-          animation: pl-progress var(--pl-dur, 2.8s) cubic-bezier(0.4,0,0.2,1) forwards;
-        }
-
-        /* ── Corner brand text ── */
-        .pl-brand {
-          position: absolute;
-          bottom: 2rem;
-          right: 2rem;
-          font-size: 0.65rem;
-          letter-spacing: 0.18em;
+        .gf-word {
+          margin-top: 1.6rem;
+          color: rgba(255,255,255,0.9);
+          font-size: 0.7rem;
+          letter-spacing: 0.42em;
+          text-indent: 0.42em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.25);
-          user-select: none;
-          font-family: inherit;
+        }
+        .gf-counter {
+          position: absolute;
+          right: clamp(1.25rem, 4vw, 3.5rem);
+          bottom: clamp(1.25rem, 4vw, 3rem);
+          z-index: 4;
+          color: #fff;
+          font-size: clamp(2.75rem, 9vw, 7rem);
+          line-height: 0.85;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
+        }
+        .gf-counter sup {
+          font-size: 0.24em;
+          vertical-align: super;
+          letter-spacing: 0.1em;
+          opacity: 0.6;
+        }
+        .gf-tag {
+          position: absolute;
+          left: clamp(1.25rem, 4vw, 3.5rem);
+          bottom: clamp(1.6rem, 4vw, 3.4rem);
+          z-index: 4;
+          color: rgba(255,255,255,0.45);
+          font-size: 0.62rem;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gf-loader { display: none; }
         }
       `}</style>
 
-      <div className={`pl-overlay${phase === "exit" ? " exit" : ""}`}>
-
-        {/* Ripple rings container */}
-        <div style={{ position: "relative", width: 72, height: 72, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="pl-ring pl-ring-1" />
-          <div className="pl-ring pl-ring-2" />
-          <div className="pl-ring pl-ring-3" />
-
-          {/* Glassmorphism button — exactly matches your Explore button */}
-          <div className="pl-glass-outer">
-            <div className="pl-logo-ring">
-              <img
-                src={logo}
-                alt="GrowFarms"
-                style={{ width: 28, height: 28, objectFit: "contain" }}
-              />
-            </div>
+      <div className="gf-loader" ref={rootRef} role="status" aria-label="Loading">
+        {/* Left panel */}
+        <div className="gf-panel" data-panel>
+          <div className="gf-panel-inner is-l">
+            <div className="gf-line is-thick at-r" data-panel-line />
           </div>
+          <div className="gf-line is-hair at-r" data-line-mid />
         </div>
 
-        {/* Label */}
-        <p className="pl-label">Loading</p>
-
-        {/* Animated dots */}
-        <div className="pl-dots" aria-hidden="true">
-          <span className="pl-dot" />
-          <span className="pl-dot" />
-          <span className="pl-dot" />
-          <span className="pl-dot" />
-          <span className="pl-dot" />
+        {/* Right panel */}
+        <div className="gf-panel" data-panel>
+          <div className="gf-panel-inner is-r">
+            <div className="gf-line is-thick at-l" data-panel-line />
+          </div>
+          <div className="gf-line is-hair at-l" data-line-mid />
         </div>
 
-        {/* Brand */}
-        <span className="pl-brand">GrowFarms</span>
+        {/* Mark + ring */}
+        <div className="gf-center">
+          <div className="gf-mark" data-fade>
+            <svg viewBox="0 0 200 200" aria-hidden="true">
+              <circle
+                cx="100"
+                cy="100"
+                r="88"
+                fill="none"
+                stroke="rgba(255,255,255,0.12)"
+                strokeWidth="1"
+              />
+              <circle
+                ref={circleRef}
+                cx="100"
+                cy="100"
+                r="88"
+                fill="none"
+                stroke={ACCENT}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+            <img src={logo} alt="" />
+          </div>
+          <p className="gf-word" data-fade>
+            Live with Nature
+          </p>
+        </div>
+
+        <span className="gf-tag" data-fade>
+          GrowFarms
+        </span>
+        <div className="gf-counter" data-fade>
+          <span ref={counterRef}>000</span>
+          <sup>%</sup>
+        </div>
       </div>
     </>
   );

@@ -3,6 +3,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import home_banner_2 from "../assets/images/home_banner_2.jpg";
 import { useNavigate } from "react-router-dom";
+import EnquiryModal from "./EnquiryModal";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -56,6 +57,7 @@ const ZOOM_SCALE = 1.3;
 
 export default function AerialMapSection() {
   const [activePin, setActivePin] = useState(null);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [displayPositions, setDisplayPositions] = useState(() =>
     pins.map((p) => ({ left: p.imgLeft, top: p.imgTop })),
   );
@@ -553,7 +555,8 @@ export default function AerialMapSection() {
                   View Details
                 </button>
                 <button
-                  className="flex-1 py-2.5 rounded-lg text-sm font-medium
+                  onClick={() => setEnquiryOpen(true)}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-medium cursor-pointer
                     transition-all duration-200 hover:bg-black/5"
                   style={{ border: "1.5px solid #315537", color: "#315537" }}
                 >
@@ -666,6 +669,7 @@ export default function AerialMapSection() {
                   View Details
                 </button>
                 <button
+                  onClick={() => setEnquiryOpen(true)}
                   className="flex-1 py-3 rounded-xl text-sm font-medium active:bg-black/5"
                   style={{ border: "1.5px solid #315537", color: "#315537" }}
                 >
@@ -676,6 +680,13 @@ export default function AerialMapSection() {
           )}
         </div>
       </>
+
+      {/* ── ENQUIRY MODAL ── */}
+      <EnquiryModal
+        open={enquiryOpen}
+        onClose={() => setEnquiryOpen(false)}
+        property={displayPin}
+      />
     </section>
   );
 }
