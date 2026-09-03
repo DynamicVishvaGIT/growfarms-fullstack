@@ -28,6 +28,7 @@ const WRITABLE = [
   "sort_order",
   "meta_title",
   "meta_description",
+  "about_eyebrow",
   "about_title",
   "about_body",
   "invest_title",
@@ -41,7 +42,15 @@ const NUMERICS = ["category_id", "map_pin_top", "map_pin_left", "sort_order"];
  * The single-image columns a project form can upload or clear. Each arrives as
  * its own multer field, and each accepts a `remove_<field>=true` flag.
  */
-const IMAGE_FIELDS = ["hero_image", "map_image", "about_image", "invest_image"];
+const IMAGE_FIELDS = [
+  "hero_image",
+  "map_image",
+  "about_image",
+  "about_image_2",
+  "about_image_3",
+  "about_image_4",
+  "invest_image",
+];
 
 const firstFile = (files, field) =>
   files && files[field] && files[field][0] ? files[field][0] : null;
@@ -362,7 +371,9 @@ const remove = asyncHandler(async (req, res) => {
   });
   if (!row) throw ApiError.notFound("Project not found");
 
-  const paths = [row.hero_image, row.map_image];
+  // Every single-image column, so deleting a project leaves no orphaned file
+  // behind on disk.
+  const paths = IMAGE_FIELDS.map((f) => row[f]);
   (row.images || []).forEach((i) => paths.push(i.image_path));
   (row.packages || []).forEach((p) =>
     (p.images || []).forEach((i) => paths.push(i.image_path)),

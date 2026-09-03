@@ -35,6 +35,7 @@ const TABS = [
 ];
 
 const BLANK_PROSE = {
+  about_eyebrow: "",
   about_title: "",
   about_body: "",
   invest_title: "",
@@ -42,10 +43,35 @@ const BLANK_PROSE = {
 };
 
 /** The single-image columns this page can replace or clear. */
-const IMAGE_FIELDS = ["hero_image", "about_image", "invest_image"];
+const IMAGE_FIELDS = [
+  "hero_image",
+  "about_image",
+  "about_image_2",
+  "about_image_3",
+  "about_image_4",
+  "invest_image",
+];
+
+/**
+ * The four tilted photo cards under the About text, in the order they sit on
+ * the page. Each slot falls back on its own, so the row always shows four cards
+ * — an empty slot renders the design's own photograph for that position.
+ */
+const ABOUT_CARDS = [
+  { field: "about_image", label: "Photo 1 (left)" },
+  { field: "about_image_2", label: "Photo 2" },
+  { field: "about_image_3", label: "Photo 3" },
+  { field: "about_image_4", label: "Photo 4 (right)" },
+];
 
 const blankImages = () =>
   Object.fromEntries(IMAGE_FIELDS.map((f) => [f, { file: null, url: null, remove: false }]));
+
+/** Rebuild the image state from a loaded (or freshly saved) project row. */
+const imagesFrom = (p) =>
+  Object.fromEntries(
+    IMAGE_FIELDS.map((f) => [f, { file: null, url: p[`${f}_url`] || null, remove: false }]),
+  );
 
 function SaveBar({ onSave, saving, label = "Save changes" }) {
   return (
@@ -105,17 +131,10 @@ export default function ProjectContent() {
     try {
       const p = await projectsApi.get(projectId);
       setProject(p);
-      setProse({
-        about_title: p.about_title || "",
-        about_body: p.about_body || "",
-        invest_title: p.invest_title || "",
-        invest_body: p.invest_body || "",
-      });
-      setImages({
-        hero_image: { file: null, url: p.hero_image_url || null, remove: false },
-        about_image: { file: null, url: p.about_image_url || null, remove: false },
-        invest_image: { file: null, url: p.invest_image_url || null, remove: false },
-      });
+      setProse(
+        Object.fromEntries(Object.keys(BLANK_PROSE).map((k) => [k, p[k] || ""])),
+      );
+      setImages(imagesFrom(p));
       setSelectedAmenities((p.amenities || []).map((a) => a.id));
       setError("");
     } catch (err) {
@@ -168,11 +187,7 @@ export default function ProjectContent() {
     try {
       const saved = await projectsApi.update(projectId, payload);
       toast.success("Section saved");
-      setImages({
-        hero_image: { file: null, url: saved.hero_image_url || null, remove: false },
-        about_image: { file: null, url: saved.about_image_url || null, remove: false },
-        invest_image: { file: null, url: saved.invest_image_url || null, remove: false },
-      });
+      setImages(imagesFrom(saved));
       setProject(saved);
     } catch (err) {
       toast.error(err.message);
@@ -293,15 +308,22 @@ export default function ProjectContent() {
 
                 <div style={{ marginTop: 24 }} className="form-grid">
                   <Field
+                    label="Small label"
+                    name="about_eyebrow"
+                    value={prose.about_eyebrow}
+                    onChange={changeProse}
+                    placeholder="About"
+                    maxLength={80}
+                    hint={'The gold line above the heading. Leave blank for "About".'}
+                  />
+                  <Field
                     label="About heading"
                     name="about_title"
-                    as="textarea"
-                    rows={3}
-                    className="span-2"
                     value={prose.about_title}
                     onChange={changeProse}
-                    placeholder={`About\n${project?.title || "this project"}\nProject`}
-                    hint="Each line break becomes a new line in the design. Leave blank to use the project title."
+                    placeholder={`${project?.title || "This project"} Project`}
+                    maxLength={200}
+                    hint="The large centred heading. Leave blank to use the project title."
                   />
                   <Field
                     label="About text"
@@ -311,19 +333,46 @@ export default function ProjectContent() {
                     className="span-2"
                     value={prose.about_body}
                     onChange={changeProse}
-                    hint="Leave blank to keep the wording the site ships with."
+                    hint="The centred paragraph under the heading. Leave blank to keep the wording the site ships with."
                   />
                 </div>
 
                 <div style={{ marginTop: 8 }}>
-                  <ImagePicker
-                    label="About photo"
-                    value={images.about_image.remove ? null : images.about_image.url}
-                    file={images.about_image.file}
-                    onPick={(f) => pickImage("about_image", f)}
-                    onClear={() => clearImage("about_image")}
-                    hint="The photograph beside the About text."
-                  />
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: 6,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color: "var(--ink-2)",
+                    }}
+                  >
+                    About photos
+                  </label>
+                  <p style={{ margin: "0 0 14px", color: "var(--ink-3)", fontSize: 13 }}>
+                    The four tilted photo cards under the paragraph, left to right. Any slot
+                    left empty keeps the photograph the site ships with for that position, so
+                    the row always shows four.
+                  </p>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: 16,
+                    }}
+                  >
+                    {ABOUT_CARDS.map(({ field, label }) => (
+                      <ImagePicker
+                        key={field}
+                        label={label}
+                        value={images[field].remove ? null : images[field].url}
+                        file={images[field].file}
+                        onPick={(f) => pickImage(field, f)}
+                        onClear={() => clearImage(field)}
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 <SaveBar onSave={saveProse} saving={saving} />

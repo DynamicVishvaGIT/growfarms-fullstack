@@ -30,9 +30,18 @@ module.exports = (sequelize) => {
       // body and one photograph, and every project tells its own story there.
       // The components keep their designed copy as the fallback, so a column
       // left blank renders exactly what the page renders today.
+      //
+      // The About section shows a small label above its heading, then a row of
+      // four tilted photo cards; each card is its own column so a project can
+      // fill in as many as it has photographs for and the row closes up around
+      // whatever is missing.
+      about_eyebrow: { type: DataTypes.STRING(80), allowNull: true },
       about_title: { type: DataTypes.STRING(200), allowNull: true },
       about_body: { type: DataTypes.TEXT, allowNull: true },
       about_image: { type: DataTypes.STRING(255), allowNull: true },
+      about_image_2: { type: DataTypes.STRING(255), allowNull: true },
+      about_image_3: { type: DataTypes.STRING(255), allowNull: true },
+      about_image_4: { type: DataTypes.STRING(255), allowNull: true },
 
       invest_title: { type: DataTypes.STRING(200), allowNull: true },
       invest_body: { type: DataTypes.TEXT, allowNull: true },
