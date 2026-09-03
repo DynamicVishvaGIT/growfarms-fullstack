@@ -2,9 +2,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
+import useApiData from "../hooks/useApiData";
+import { getFaqs } from "../lib/api";
+import { useProject } from "../context/projectContext";
+
 gsap.registerPlugin(ScrollTrigger);
 
-const faqs = [
+const FALLBACK_FAQS = [
   {
     id: 1,
     question: "Can I use Spline for free?",
@@ -332,6 +336,20 @@ export default function FAQSection() {
   const [openId, setOpenId]   = useState(1);
   const sectionRef             = useRef(null);
   const headingRef             = useRef(null);
+
+  const project = useProject();
+
+  const { data: faqs } = useApiData(
+    async (signal) => {
+      // Project-specific FAQs when the project page supplies them, otherwise
+      // the global list.
+      if (project?.faqs?.length) return project.faqs;
+      const rows = await getFaqs(undefined, signal);
+      return rows?.length ? rows : null;
+    },
+    FALLBACK_FAQS,
+    [project?.id],
+  );
 
   const toggle = useCallback((id) => {
     setOpenId((prev) => (prev === id ? null : id));

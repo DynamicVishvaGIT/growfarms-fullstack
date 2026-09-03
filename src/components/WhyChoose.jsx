@@ -8,13 +8,17 @@ import Animals from "../assets/images/animals.png";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
+import useApiData from "../hooks/useApiData";
+import { getWhyChooseCards } from "../lib/api";
+import { useProject } from "../context/projectContext";
+
 gsap.registerPlugin(ScrollTrigger);
 
 /* ---------------------------------------------------------------------
    CARD DATA
 --------------------------------------------------------------------- */
 
-const CARDS = [
+const FALLBACK_CARDS = [
   {
     id: "left",
     src: Animals,
@@ -45,7 +49,42 @@ const CARDS = [
    Why Choose Sarasview
 --------------------------------------------------------------------- */
 
+/**
+ * The layout is a fixed three-slot row (left / center / right), each with its
+ * own entrance direction and its own ref. So rather than rendering a variable
+ * list, each slot is filled from the API when a card exists for that position
+ * and falls back to the original card otherwise.
+ */
+function mergeCards(rows) {
+  if (!rows?.length) return null;
+
+  return FALLBACK_CARDS.map((fallback) => {
+    const match = rows.find((r) => r.position === fallback.id);
+    if (!match) return fallback;
+    return {
+      id: fallback.id,
+      src: match.image_url || fallback.src,
+      alt: match.alt_text || fallback.alt,
+      title: match.title || fallback.title,
+      body: match.body || fallback.body,
+      objPos: match.object_position || fallback.objPos,
+    };
+  });
+}
+
 export default function Aboutsarasview() {
+  const project = useProject();
+
+  const { data: CARDS } = useApiData(
+    async (signal) => {
+      if (project?.whyChooseCards?.length) return mergeCards(project.whyChooseCards);
+      const rows = await getWhyChooseCards(undefined, signal);
+      return mergeCards(rows);
+    },
+    FALLBACK_CARDS,
+    [project?.id],
+  );
+
   const sectionRef = useRef(null);
   const eyebrowRef = useRef(null);
   const headlineRef = useRef(null);

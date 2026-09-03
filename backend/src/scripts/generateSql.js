@@ -1,0 +1,461 @@
+"use strict";
+
+/**
+ * Emit database/schema.sql and database/seed.sql from the models and seed data.
+ *
+ * Runs entirely offline — Sequelize's query generator builds the SQL strings
+ * without a connection — so the checked-in .sql files can never drift from the
+ * models they were generated from. Re-run after changing any model:
+ *
+ *   node src/scripts/generateSql.js
+ */
+
+const fs = require("fs");
+const bcrypt = require("bcryptjs");
+const path = require("path");
+const env = require("../config/env");
+const db = require("../models");
+const data = require("./seedData");
+
+const OUT_DIR = path.resolve(__dirname, "../../database");
+const qi = db.sequelize.getQueryInterface();
+const qg = qi.queryGenerator;
+
+/* ── schema.sql ──────────────────────────────────────────────────────────── */
+
+/** Tables in dependency order, so foreign keys always resolve. */
+const ORDER = [
+  "Admin",
+  "Category",
+  "Project",
+  "ProjectImage",
+  "Package",
+  "PackageImage",
+  "PackageTag",
+  "Amenity",
+  "ProjectAmenity",
+  "Facility",
+  "TravelRoute",
+  "BuyingStep",
+  "WhyPaliSlide",
+  "WhyChooseCard",
+  "PhilosophyCard",
+  "Faq",
+  "Testimonial",
+  "Blog",
+  "BlogChecklist",
+  "Enquiry",
+  "WebsiteContent",
+  "Setting",
+];
+
+function tableSql(model) {
+  const attributes = qg.attributesToSQL(model.rawAttributes, { table: model.tableName });
+  let sql = qg.createTableQuery(model.getTableName(), attributes, {
+    ...model.options,
+    charset: "utf8mb4",
+    collate: "utf8mb4_unicode_ci",
+    engine: "InnoDB",
+  });
+
+  // Sequelize emits one long line; break it so the file is reviewable.
+  sql = sql
+    .replace(/^CREATE TABLE IF NOT EXISTS `([^`]+)` \(/, "CREATE TABLE IF NOT EXISTS `$1` (\n  ")
+    .replace(/, `/g, ",\n  `")
+    .replace(/, (PRIMARY KEY|UNIQUE|FOREIGN KEY|CONSTRAINT|KEY)/g, ",\n  $1")
+    .replace(/\) ENGINE=/, "\n) ENGINE=");
+
+  return sql;
+}
+
+function indexSql(model) {
+  const out = [];
+  for (const index of model.options.indexes || []) {
+    const fields = index.fields.map((f) => `\`${f}\``).join(", ");
+    const name = index.name || `${model.tableName}_${index.fields.join("_")}`;
+    const unique = index.unique ? "UNIQUE " : "";
+    out.push(`CREATE ${unique}INDEX \`${name}\` ON \`${model.tableName}\` (${fields});`);
+  }
+  return out;
+}
+
+function buildSchema() {
+  const lines = [];
+
+  lines.push("-- ══════════════════════════════════════════════════════════════════════");
+  lines.push("--  Grow Farms — MySQL schema");
+  lines.push("--");
+  lines.push("--  Generated from the Sequelize models by:");
+  lines.push("--    node src/scripts/generateSql.js");
+  lines.push("--");
+  lines.push("--  You do not have to run this by hand — `npm run db:migrate` builds the");
+  lines.push("--  same tables. This file is here for DBAs, for cPanel/phpMyAdmin imports,");
+  lines.push("--  and for review.");
+  lines.push("-- ══════════════════════════════════════════════════════════════════════");
+  lines.push("");
+  lines.push(`CREATE DATABASE IF NOT EXISTS \`${env.db.name}\``);
+  lines.push("  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+  lines.push(`USE \`${env.db.name}\`;`);
+  lines.push("");
+  lines.push("SET FOREIGN_KEY_CHECKS = 0;");
+  lines.push("");
+
+  for (const name of ORDER) {
+    const model = db[name];
+    if (!model) continue;
+
+    lines.push("-- ─────────────────────────────────────────────────────────────────────");
+    lines.push(`--  ${model.tableName}`);
+    lines.push("-- ─────────────────────────────────────────────────────────────────────");
+    lines.push(tableSql(model));
+    lines.push("");
+
+    const indexes = indexSql(model);
+    if (indexes.length) {
+      lines.push(...indexes);
+      lines.push("");
+    }
+  }
+
+  lines.push("SET FOREIGN_KEY_CHECKS = 1;");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+/* ── seed.sql ────────────────────────────────────────────────────────────── */
+
+const esc = (v) => {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "boolean") return v ? "1" : "0";
+  if (typeof v === "number") return String(v);
+  if (typeof v === "object") return db.sequelize.escape(JSON.stringify(v));
+  return db.sequelize.escape(String(v));
+};
+
+function insert(table, rows) {
+  if (!rows.length) return "";
+  const columns = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  const head = `INSERT INTO \`${table}\` (${columns.map((c) => `\`${c}\``).join(", ")}) VALUES`;
+  const values = rows.map(
+    (r) => `  (${columns.map((c) => esc(r[c] === undefined ? null : r[c])).join(", ")})`,
+  );
+  return `${head}\n${values.join(",\n")};\n`;
+}
+
+const NOW = "2026-09-02 12:00:00";
+const stamp = (row) => ({ ...row, created_at: NOW, updated_at: NOW });
+
+function buildSeed() {
+  const lines = [];
+
+  lines.push("-- ══════════════════════════════════════════════════════════════════════");
+  lines.push("--  Grow Farms — seed data");
+  lines.push("--");
+  lines.push("--  Every row below was extracted from the existing React frontend.");
+  lines.push("--  Generated by: node src/scripts/generateSql.js");
+  lines.push("--");
+  lines.push("--  Prefer `npm run db:seed` — it is idempotent, hashes the admin password");
+  lines.push("--  with bcrypt at runtime, and can be re-run safely. Use this file only");
+  lines.push("--  for a raw phpMyAdmin / cPanel import.");
+  lines.push("--");
+  lines.push(`--  NOTE: the admin password hash below is for '${env.seedAdmin.password}'`);
+  lines.push("--        (taken from SEED_ADMIN_PASSWORD in .env at generation time).");
+  lines.push("--        Change it immediately after your first login.");
+  lines.push("-- ══════════════════════════════════════════════════════════════════════");
+  lines.push("");
+  lines.push(`USE \`${env.db.name}\`;`);
+  lines.push("SET FOREIGN_KEY_CHECKS = 0;");
+  lines.push("");
+
+  // Hashed here rather than pasted as a literal, so the checked-in SQL always
+  // matches the password this project actually documents.
+  const passwordHash = bcrypt.hashSync(env.seedAdmin.password, 12);
+  if (!bcrypt.compareSync(env.seedAdmin.password, passwordHash)) {
+    throw new Error("bcrypt self-check failed — refusing to write a bad password hash");
+  }
+
+  lines.push("-- ── admins ──");
+  lines.push(
+    insert("admins", [
+      stamp({
+        id: 1,
+        name: env.seedAdmin.name,
+        email: env.seedAdmin.email.toLowerCase(),
+        password_hash: passwordHash,
+        role: "super_admin",
+        is_active: 1,
+      }),
+    ]),
+  );
+
+  // Categories keep explicit ids so later inserts can reference them.
+  const catIds = {};
+  lines.push("-- ── categories ──");
+  lines.push(
+    insert(
+      "categories",
+      data.categories.map((c, i) => {
+        catIds[c.slug] = i + 1;
+        return stamp({ id: i + 1, is_active: 1, ...c });
+      }),
+    ),
+  );
+
+  const projIds = {};
+  lines.push("-- ── projects ──");
+  lines.push(
+    insert(
+      "projects",
+      data.projects.map((p, i) => {
+        projIds[p.slug] = i + 1;
+        const { category_slug, ...rest } = p;
+        return stamp({ id: i + 1, category_id: catIds[category_slug] || null, ...rest });
+      }),
+    ),
+  );
+
+  lines.push("-- ── project_images ──");
+  lines.push(
+    insert(
+      "project_images",
+      data.projects.map((p, i) =>
+        stamp({
+          id: i + 1,
+          project_id: projIds[p.slug],
+          image_path: p.hero_image,
+          alt_text: p.title,
+          is_primary: 1,
+          sort_order: 0,
+        }),
+      ),
+    ),
+  );
+
+  const pkgIds = {};
+  lines.push("-- ── packages ──");
+  lines.push(
+    insert(
+      "packages",
+      data.packages.map((p, i) => {
+        pkgIds[p.slug] = i + 1;
+        const { project_slug, category_slug, images, tags, ...rest } = p;
+        return stamp({
+          id: i + 1,
+          project_id: projIds[project_slug] || null,
+          category_id: catIds[category_slug] || null,
+          ...rest,
+        });
+      }),
+    ),
+  );
+
+  const pkgImages = [];
+  const pkgTags = [];
+  data.packages.forEach((p) => {
+    (p.images || []).forEach((src, i) =>
+      pkgImages.push(
+        stamp({
+          id: pkgImages.length + 1,
+          package_id: pkgIds[p.slug],
+          image_path: src,
+          alt_text: p.title,
+          is_primary: i === 0 ? 1 : 0,
+          sort_order: i,
+        }),
+      ),
+    );
+    (p.tags || []).forEach((t, i) =>
+      pkgTags.push(
+        stamp({
+          id: pkgTags.length + 1,
+          package_id: pkgIds[p.slug],
+          label: t.label,
+          accent_color: t.accent_color,
+          sort_order: i,
+        }),
+      ),
+    );
+  });
+
+  lines.push("-- ── package_images ──");
+  lines.push(insert("package_images", pkgImages));
+  lines.push("-- ── package_tags ──");
+  lines.push(insert("package_tags", pkgTags));
+
+  lines.push("-- ── amenities ──");
+  lines.push(
+    insert(
+      "amenities",
+      data.amenities.map((a, i) => stamp({ id: i + 1, is_active: 1, ...a })),
+    ),
+  );
+
+  const projectAmenities = [];
+  Object.values(projIds).forEach((projectId) => {
+    data.amenities.forEach((_, i) =>
+      projectAmenities.push(
+        stamp({
+          id: projectAmenities.length + 1,
+          project_id: projectId,
+          amenity_id: i + 1,
+          sort_order: i,
+        }),
+      ),
+    );
+  });
+  lines.push("-- ── project_amenities ──");
+  lines.push(insert("project_amenities", projectAmenities));
+
+  const sarasview = projIds.sarasview || null;
+
+  lines.push("-- ── facilities ──");
+  lines.push(
+    insert(
+      "facilities",
+      data.facilities.map((f, i) =>
+        stamp({ id: i + 1, project_id: sarasview, is_active: 1, ...f }),
+      ),
+    ),
+  );
+
+  lines.push("-- ── travel_routes ──");
+  lines.push(
+    insert(
+      "travel_routes",
+      data.travelRoutes.map((r, i) =>
+        stamp({ id: i + 1, project_id: sarasview, is_active: 1, ...r }),
+      ),
+    ),
+  );
+
+  lines.push("-- ── buying_steps ──");
+  lines.push(
+    insert(
+      "buying_steps",
+      data.buyingSteps.map((s, i) =>
+        stamp({ id: i + 1, is_active: 1, default_open: 0, rotate: 0, ...s }),
+      ),
+    ),
+  );
+
+  lines.push("-- ── why_pali_slides ──");
+  lines.push(
+    insert(
+      "why_pali_slides",
+      data.whyPaliSlides.map((s, i) => stamp({ id: i + 1, is_active: 1, ...s })),
+    ),
+  );
+
+  lines.push("-- ── why_choose_cards ──");
+  lines.push(
+    insert(
+      "why_choose_cards",
+      data.whyChooseCards.map((c, i) =>
+        stamp({ id: i + 1, project_id: sarasview, is_active: 1, ...c }),
+      ),
+    ),
+  );
+
+  lines.push("-- ── philosophy_cards ──");
+  lines.push(
+    insert(
+      "philosophy_cards",
+      data.philosophyCards.map((c, i) => stamp({ id: i + 1, is_active: 1, ...c })),
+    ),
+  );
+
+  lines.push("-- ── faqs ──");
+  lines.push(
+    insert(
+      "faqs",
+      data.faqs.map((f, i) => stamp({ id: i + 1, is_active: 1, project_id: null, ...f })),
+    ),
+  );
+
+  lines.push("-- ── testimonials ──");
+  lines.push(
+    insert(
+      "testimonials",
+      data.testimonials.map((t, i) => stamp({ id: i + 1, is_active: 1, ...t })),
+    ),
+  );
+
+  const blogChecklists = [];
+  lines.push("-- ── blogs ──");
+  lines.push(
+    insert(
+      "blogs",
+      data.blogs.map((b, i) => {
+        const { category_slug, checklist, ...rest } = b;
+        (checklist || []).forEach((item, ci) =>
+          blogChecklists.push(
+            stamp({
+              id: blogChecklists.length + 1,
+              blog_id: i + 1,
+              item_text: item,
+              sort_order: ci,
+            }),
+          ),
+        );
+        return stamp({
+          id: i + 1,
+          // Duplicate source titles need distinct slugs.
+          slug: i === 0 ? "better-agriculture-for-better-future" : `a-farmer-is-a-person-who-works-in-agriculture-${i}`,
+          category_id: catIds[category_slug] || null,
+          views: 0,
+          ...rest,
+        });
+      }),
+    ),
+  );
+
+  lines.push("-- ── blog_checklist ──");
+  lines.push(insert("blog_checklist", blogChecklists));
+
+  lines.push("-- ── website_content ──");
+  lines.push(
+    insert(
+      "website_content",
+      data.websiteContent.map((c, i) => stamp({ id: i + 1, is_active: 1, ...c })),
+    ),
+  );
+
+  lines.push("-- ── settings ──");
+  lines.push(
+    insert(
+      "settings",
+      data.settings.map((s, i) =>
+        stamp({
+          id: i + 1,
+          setting_key: s.key,
+          setting_value: s.value,
+          label: s.label,
+          setting_group: s.group || "general",
+          setting_type: s.type || "text",
+          sort_order: s.sort_order || 0,
+        }),
+      ),
+    ),
+  );
+
+  lines.push("");
+  lines.push("SET FOREIGN_KEY_CHECKS = 1;");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+/* ── Write ───────────────────────────────────────────────────────────────── */
+
+fs.mkdirSync(OUT_DIR, { recursive: true });
+
+const schemaPath = path.join(OUT_DIR, "schema.sql");
+const seedPath = path.join(OUT_DIR, "seed.sql");
+
+fs.writeFileSync(schemaPath, buildSchema(), "utf8");
+fs.writeFileSync(seedPath, buildSeed(), "utf8");
+
+console.log(`[sql] wrote ${schemaPath}`);
+console.log(`[sql] wrote ${seedPath}`);
+process.exit(0);

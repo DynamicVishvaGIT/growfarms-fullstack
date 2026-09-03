@@ -617,6 +617,8 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import useApiData from "../hooks/useApiData";
+import { getContent, contentBlock } from "../lib/api";
 
 import logo_img from "../assets/images/grow-farms-logo.png";
 
@@ -688,6 +690,21 @@ const HomeBanner = () => {
   const textStageRefs = useRef(
     TEXT_STAGES.map(() => ({ wrap: null, eyebrow: null, h1: null, p: null }))
   );
+
+  // The scroll-frame timeline is built around exactly three stages, so the
+  // count stays fixed and only the copy is swapped in from the CMS.
+  const { data: stageText } = useApiData(async (signal) => {
+    const grouped = await getContent("home", signal);
+    if (!grouped) return null;
+
+    return TEXT_STAGES.map((fallback, i) => {
+      const block = contentBlock(grouped, "home", "hero_stage_" + (i + 1));
+      return {
+        heading: block?.title || fallback.heading,
+        sub: block?.subtitle || fallback.sub,
+      };
+    });
+  }, TEXT_STAGES);
 
   // ── vh fix ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1114,7 +1131,7 @@ const HomeBanner = () => {
                       transform : i === 0 ? "translateY(0px)" : "translateY(32px)",
                     }}
                   >
-                    {stage.heading}
+                    {(stageText[i] || stage).heading}
                   </h1>
                   <p
                     ref={(el) => {
@@ -1127,7 +1144,7 @@ const HomeBanner = () => {
                       transform : i === 0 ? "translateY(0px)" : "translateY(44px)",
                     }}
                   >
-                    {stage.sub}
+                    {(stageText[i] || stage).sub}
                   </p>
                 </div>
               ))}

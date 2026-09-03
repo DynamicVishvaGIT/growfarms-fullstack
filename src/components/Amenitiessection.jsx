@@ -6,6 +6,10 @@ import rightCard from "../assets/images/LeafCard2.png";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
+import useApiData from "../hooks/useApiData";
+import { getAmenities } from "../lib/api";
+import { useProject } from "../context/projectContext";
+
 gsap.registerPlugin(ScrollTrigger);
 
 /* ================================================================
@@ -141,7 +145,7 @@ const icons = {
    AMENITIES DATA
 ================================================================ */
 
-const amenities = [
+const FALLBACK_AMENITIES = [
   { icon: icons.water, label: "Water Facility" },
   { icon: icons.electricity, label: "Electricity" },
   { icon: icons.gated, label: "Gated Community" },
@@ -413,12 +417,52 @@ function LeafCard({
    MAIN COMPONENT
 ================================================================ */
 
+/**
+ * Resolve an amenity row to a renderable icon. The stored icon_key maps onto
+ * the hand-tuned inline SVGs above, which is what keeps the hover animation
+ * working; an uploaded image is used only when no key matches.
+ */
+function toAmenityCard(row) {
+  const builtIn = icons[row.icon_key];
+  if (builtIn) return { icon: builtIn, label: row.name };
+
+  if (row.icon_image_url) {
+    return {
+      icon: (
+        <img
+          src={row.icon_image_url}
+          alt=""
+          className="amenity-icon"
+          style={{ width: 40, height: 40, objectFit: "contain" }}
+        />
+      ),
+      label: row.name,
+    };
+  }
+
+  return { icon: icons.water, label: row.name };
+}
+
 export default function AmenitiesSection() {
 
   const sectionRef = useRef(null);
   const eyebrowRef = useRef(null);
   const headingRef = useRef(null);
   const waveRef = useRef(null);
+
+  const project = useProject();
+
+  const { data: amenities } = useApiData(
+    async (signal) => {
+      // A project page shows that project's own amenity selection; anywhere
+      // else falls back to the full active list.
+      if (project?.amenities?.length) return project.amenities.map(toAmenityCard);
+      const rows = await getAmenities(signal);
+      return rows?.length ? rows.map(toAmenityCard) : null;
+    },
+    FALLBACK_AMENITIES,
+    [project?.id],
+  );
 
 
   useEffect(() => {

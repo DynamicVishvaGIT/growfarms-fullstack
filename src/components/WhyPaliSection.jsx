@@ -4,8 +4,10 @@ import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import pali_img_1 from "../assets/images/Why_Pali_1.png";
 import pali_img_2 from "../assets/images/Why_Pali_2.png";
 import pali_img_3 from "../assets/images/Why_Pali_3.png";
+import useApiData from "../hooks/useApiData";
+import { getWhyPaliSlides } from "../lib/api";
 
-const SLIDES = [
+const FALLBACK_SLIDES = [
   {
     title: "Smart Investment",
     description:
@@ -38,7 +40,6 @@ const SLIDES = [
   },
 ];
 
-const COUNT = SLIDES.length;
 const AUTOPLAY_MS = 2000;
 // Card proportions from the design spec (471 x 602.38) — locked in as an
 // aspect-ratio so the card scales correctly at any viewport width instead
@@ -55,6 +56,23 @@ export default function WhyPaliSection() {
   const [dragging, setDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  const { data: SLIDES } = useApiData(
+    async (signal) => {
+      const rows = await getWhyPaliSlides(signal);
+      if (!rows?.length) return null;
+      return rows.map((r, i) => ({
+        title: r.title,
+        description: r.description || "",
+        image: r.image_url || FALLBACK_SLIDES[i % FALLBACK_SLIDES.length].image,
+      }));
+    },
+    FALLBACK_SLIDES,
+  );
+
+  // Derived from the live list so adding or removing a slide in the admin
+  // keeps the carousel's wrap-around maths correct.
+  const COUNT = SLIDES.length;
 
   const sectionRef = useRef(null);
   const trackRef = useRef(null);

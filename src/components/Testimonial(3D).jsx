@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
+import useApiData from "../hooks/useApiData";
+import { getTestimonials } from "../lib/api";
+import { useProject } from "../context/projectContext";
 
-const DATA = [
+const FALLBACK_DATA = [
   "fcx0LV7C2pE",
   "DxA4B7bJpRk",
   "AYSdZFo1Yxw",
@@ -9,16 +12,25 @@ const DATA = [
   "TJfRcYy5y1M",
 ];
 
-const N = DATA.length;
-const halfAngleRad = Math.PI / N;
-
 const W_PX = 700;
 const GAP_PX = 30;
-const Z_PX = (-1 * (W_PX / 2 + GAP_PX)) / Math.tan(halfAngleRad);
-
 const MW_PX = 260;
 const MGAP_PX = 12;
-const MZ_PX = (-1 * (MW_PX / 2 + MGAP_PX)) / Math.tan(halfAngleRad);
+
+/**
+ * The ring geometry depends on how many cards are on it, so it is derived
+ * from the live list rather than fixed at module load. With the original six
+ * testimonials this produces exactly the same numbers as before.
+ */
+function ringGeometry(count) {
+  const n = Math.max(2, count);
+  const halfAngleRad = Math.PI / n;
+  return {
+    n,
+    zDesktop: (-1 * (W_PX / 2 + GAP_PX)) / Math.tan(halfAngleRad),
+    zMobile: (-1 * (MW_PX / 2 + MGAP_PX)) / Math.tan(halfAngleRad),
+  };
+}
 
 function getScreenType() {
   if (typeof window === "undefined") return "desktop";
@@ -35,6 +47,24 @@ export default function Carousel3D() {
   const [isVisible, setIsVisible] = useState(false);
   const cardRefs = useRef([]);
   const sceneRef = useRef(null);
+
+  const project = useProject();
+
+  const { data: videos } = useApiData(
+    async (signal) => {
+      // A project page plays that project's own reel when it has one; the home
+      // page and any project without its own get the shared list.
+      const rows = project?.testimonials?.length
+        ? project.testimonials
+        : await getTestimonials(signal);
+      const ids = (rows || []).map((r) => r.youtube_id).filter(Boolean);
+      return ids.length ? ids : null;
+    },
+    FALLBACK_DATA,
+    [project?.id],
+  );
+
+  const { n: N, zDesktop, zMobile } = ringGeometry(videos.length);
 
   useEffect(() => {
     const onResize = () => setScreenType(getScreenType());
@@ -96,7 +126,7 @@ export default function Carousel3D() {
   const laptop = screenType === "laptop";
 
   const cardW = mobile ? MW_PX : W_PX;
-  const zVal = mobile ? MZ_PX : Z_PX;
+  const zVal = mobile ? zMobile : zDesktop;
   const persp = mobile ? 600 : 1000;
 
   const cardH = mobile ? 190 : laptop ? 300 : 400;
@@ -257,7 +287,7 @@ export default function Carousel3D() {
         />
 
         <div className="c3d-a3d">
-          {DATA.map((videoId, i) => {
+          {videos.map((videoId, i) => {
             const angleDeg = (360 / N) * i;
             const isPlaying = playingIndex === i;
             const isCentered = centerIndex === i;

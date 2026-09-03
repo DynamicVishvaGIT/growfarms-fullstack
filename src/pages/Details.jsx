@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 
 import DetailsBanner from "../assets/images/Details_Banner.jpg";
 
@@ -17,6 +18,10 @@ import LandPackages from "../components/LandPackages";
 import InvestInPaliSection from "../components/InvestInPaliSection";
 import Amenitiessection from "../components/Amenitiessection";
 
+import useApiData from "../hooks/useApiData";
+import { getProject, getFeaturedProject } from "../lib/api";
+import ProjectProvider from "../context/ProjectProvider";
+
 import RoadIcon from "../assets/images/By_Road.png";
 import TrainIcon from "../assets/images/By_Train.png";
 import AirIcon from "../assets/images/By_Air.png";
@@ -25,7 +30,7 @@ import AirIcon from "../assets/images/By_Air.png";
    Content
 --------------------------------------------------------------------- */
 
-const FACILITIES = [
+const FALLBACK_FACILITIES = [
   { img: Hospital, label: "Hospital" },
   { img: School, label: "School" },
   { img: College, label: "College" },
@@ -33,7 +38,7 @@ const FACILITIES = [
   { img: Highway, label: "Highway" },
 ];
 
-const ROUTES = [
+const FALLBACK_ROUTES = [
   {
     icon: RoadIcon,
     label: "By Road",
@@ -152,6 +157,23 @@ const FacilityCard = ({ img, label, index }) => {
 
 const Details = () => {
   const [heroVisible, setHeroVisible] = useState(false);
+  const { slug } = useParams();
+
+  // No slug (a bare /details link) falls back to the featured project, which
+  // keeps every existing link working exactly as before.
+  const { data: project } = useApiData(
+    (signal) => (slug ? getProject(slug, signal) : getFeaturedProject(signal)),
+    null,
+    [slug],
+  );
+
+  const facilities =
+    project?.facilities?.length
+      ? project.facilities.map((f) => ({ img: f.icon_image_url, label: f.name }))
+      : FALLBACK_FACILITIES;
+
+  const bannerImage = project?.hero_image_url || DetailsBanner;
+  const projectTitle = project?.title || "Sarasview";
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -162,6 +184,7 @@ const Details = () => {
   }, []);
 
   return (
+    <ProjectProvider project={project}>
     <section className="relative w-full min-h-screen overflow-x-hidden">
       {/* ---------------------------------------------------------------
           Banner
@@ -179,8 +202,8 @@ const Details = () => {
       >
         {/* Banner Image */}
         <img
-          src={DetailsBanner}
-          alt="Details Banner"
+          src={bannerImage}
+          alt={projectTitle}
           className="
             absolute inset-0
             w-full h-full
@@ -233,7 +256,7 @@ const Details = () => {
                 : "translateY(20px)",
             }}
           >
-            Sarasview
+            {projectTitle}
           </h1>
         </div>
 
@@ -305,7 +328,7 @@ const Details = () => {
               md:gap-5
             "
           >
-            {FACILITIES.map(({ img, label }, index) => (
+            {facilities.map(({ img, label }, index) => (
               <FacilityCard
                 key={label}
                 img={img}
@@ -333,6 +356,7 @@ const Details = () => {
 
       <FAQSection />
     </section>
+    </ProjectProvider>
   );
 };
 

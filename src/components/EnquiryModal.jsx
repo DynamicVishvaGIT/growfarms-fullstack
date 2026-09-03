@@ -10,6 +10,7 @@ import {
   compactErrors,
   fieldClass,
 } from "../lib/validation";
+import { submitEnquiry, toFormErrors } from "../lib/api";
 
 const EMPTY_FORM = { name: "", email: "", phone: "", message: "" };
 
@@ -57,6 +58,8 @@ export default function EnquiryModal({ open, onClose, property }) {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
   const overlayRef = useRef(null);
   const backdropRef = useRef(null);
@@ -110,6 +113,7 @@ export default function EnquiryModal({ open, onClose, property }) {
               setErrors({});
               setTouched({});
               setSent(false);
+              setSendError("");
             },
           })
           .to(cardRef.current, {
@@ -176,8 +180,19 @@ export default function EnquiryModal({ open, onClose, property }) {
     setErrors((prev) => ({ ...prev, [name]: validateField(name, form) }));
   };
 
-  const handleSubmit = (e) => {
+  const shake = () => {
+    gsap.fromTo(
+      cardRef.current,
+      { x: -8 },
+      { x: 0, duration: 0.45, ease: "elastic.out(1, 0.35)" },
+    );
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (sending) return;
+
+    setSendError("");
 
     const next = compactErrors({
       name: validateName(form.name),
@@ -190,18 +205,38 @@ export default function EnquiryModal({ open, onClose, property }) {
     setTouched(Object.fromEntries(FIELD_ORDER.map((f) => [f, true])));
 
     if (Object.keys(next).length) {
-      gsap.fromTo(
-        cardRef.current,
-        { x: -8 },
-        { x: 0, duration: 0.45, ease: "elastic.out(1, 0.35)" },
-      );
+      shake();
       const firstBad = FIELD_ORDER.find((f) => next[f]);
       cardRef.current?.querySelector(`[name="${firstBad}"]`)?.focus();
       return;
     }
 
-    // TODO: post to the real enquiry endpoint once it exists.
-    setSent(true);
+    setSending(true);
+    try {
+      await submitEnquiry({
+        source: "enquiry_modal",
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        message: form.message.trim() || undefined,
+        // `property` is the map pin this modal was opened from.
+        project_slug: property?.slug || property?.id || undefined,
+        subject: property?.label || property?.title || undefined,
+      });
+      setSent(true);
+    } catch (err) {
+      const fieldErrors = toFormErrors(err);
+      if (Object.keys(fieldErrors).length) {
+        setErrors(fieldErrors);
+        const firstBad = FIELD_ORDER.find((f) => fieldErrors[f]);
+        if (firstBad) cardRef.current?.querySelector(`[name="${firstBad}"]`)?.focus();
+      } else {
+        setSendError(err.message || "Something went wrong. Please try again.");
+      }
+      shake();
+    } finally {
+      setSending(false);
+    }
   };
 
   // ── Success panel entrance ────────────────────────────────────────────────
@@ -362,13 +397,21 @@ export default function EnquiryModal({ open, onClose, property }) {
                 maxLength={1000}
               />
 
+              {sendError && (
+                <p className="text-xs text-red-600" role="alert">
+                  {sendError}
+                </p>
+              )}
+
               <button
                 ref={(el) => (rowsRef.current[5] = el)}
                 type="submit"
+                disabled={sending}
                 className="mt-1 flex w-fit cursor-pointer items-center gap-2 rounded-full bg-[#315537]
-                  py-3.5 pr-7 pl-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]"
+                  py-3.5 pr-7 pl-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]
+                  disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Send Enquiry
+                {sending ? "Sending…" : "Send Enquiry"}
                 <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
               </button>
             </form>

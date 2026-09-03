@@ -3,10 +3,14 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Land_Pakages_1 from "../assets/images/Land_Pakages_1.jpg";
 import Land_Pakages_2 from "../assets/images/Land_Pakages_2.jpg";
+import useApiData from "../hooks/useApiData";
+import { getPackages } from "../lib/api";
+import { useProject } from "../context/projectContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const packages = [
+/** Original cards — the fallback whenever the API has nothing to give. */
+const FALLBACK_PACKAGES = [
   {
     id: 1,
     title: "Farm Land",
@@ -288,17 +292,61 @@ function PackageCard({ pkg, index }) {
                 }
           }
         >
-          Book Now
+          {pkg.button.label || "Book Now"}
         </button>
       </div>
     </div>
   );
 }
 
+/**
+ * Map an API package onto the exact card shape PackageCard already renders,
+ * so the layout, tag pills, button variants and fan rotation are untouched.
+ */
+function toCard(pkg, index) {
+  const images = pkg.image_urls?.length
+    ? pkg.image_urls
+    : FALLBACK_PACKAGES[index % FALLBACK_PACKAGES.length].images;
+
+  return {
+    id: pkg.id,
+    title: pkg.title,
+    description: pkg.description || "",
+    tags: (pkg.tags || []).map((t) => ({
+      label: t.label,
+      // A null accent renders the outlined pill, exactly as before.
+      ...(t.accent_color ? { accent: t.accent_color } : {}),
+    })),
+    button: {
+      variant: pkg.button_variant || "outline",
+      color: pkg.button_color || "#D4AF37",
+      label: pkg.button_label || "Book Now",
+    },
+    // The slideshow crossfades between three slots; repeat a single image
+    // rather than leaving the loop with nothing to advance to.
+    images: images.length >= 3 ? images : [images[0], images[0], images[0]],
+    rotate: Number(pkg.card_rotate) || 0,
+  };
+}
+
 export default function LandPackages() {
   const headingRef = useRef(null);
   const eyebrowRef = useRef(null);
   const sectionRef = useRef(null);
+
+  const project = useProject();
+
+  const { data: packages } = useApiData(
+    async (signal) => {
+      const rows = await getPackages(
+        project?.id ? { project_id: project.id } : undefined,
+        signal,
+      );
+      return rows?.length ? rows.map(toCard) : null;
+    },
+    FALLBACK_PACKAGES,
+    [project?.id],
+  );
 
   useEffect(() => {
     if (

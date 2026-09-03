@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
+import useApiData from '../hooks/useApiData';
+import { getBuyingSteps } from '../lib/api';
+import { useProject } from '../context/projectContext';
+
 gsap.registerPlugin(ScrollTrigger);
 
 const prefersReducedMotion = () =>
@@ -11,7 +15,7 @@ const prefersReducedMotion = () =>
 /* ---------------------------------------------------------------------
    Step data — positions are % of the desktop stage (viewBox 0 0 1000 900)
 --------------------------------------------------------------------- */
-const STEPS = [
+const FALLBACK_STEPS = [
   {
     number: '01',
     title: 'Explore Available Plots',
@@ -227,6 +231,39 @@ export default function HowToBuyFarmLand() {
   const cardRefs = useRef([]);
   const arrowRef = useRef(null);
   const mobileItemRefs = useRef([]);
+
+  const project = useProject();
+
+  // The dotted S-curve is drawn against a fixed four-card stage, so the layout
+  // values (top/left/width/rotate) come from the CMS but fall back per slot.
+  const { data: STEPS } = useApiData(async (signal) => {
+    // A project with its own journey uses it; every other page gets the shared
+    // steps, and those fall back to the designed four.
+    const rows = project?.buyingSteps?.length
+      ? project.buyingSteps
+      : await getBuyingSteps({ scope: 'details' }, signal);
+    if (!rows?.length) return null;
+
+    // The dotted S-curve behind these cards is a fixed four-slot SVG path, and
+    // each card is absolutely positioned onto one of those slots. A fifth step
+    // would reuse slot one's coordinates and land on top of it, so the section
+    // shows the first four and the admin panel says so on the Buying Steps
+    // screen. Same fixed-shape rule as the three-stage hero and the three
+    // Why-Choose slots.
+    return rows.slice(0, FALLBACK_STEPS.length).map((r, i) => {
+      const fallback = FALLBACK_STEPS[i];
+      return {
+        number: r.step_number || fallback.number,
+        title: r.title || fallback.title,
+        description: r.description || fallback.description,
+        top: r.pos_top || fallback.top,
+        left: r.pos_left || fallback.left,
+        width: r.width || fallback.width,
+        rotate: r.rotate === null || r.rotate === undefined ? fallback.rotate : Number(r.rotate),
+        defaultOpen: Boolean(r.default_open),
+      };
+    });
+  }, FALLBACK_STEPS, [project?.id]);
 
   const initialOpen = STEPS.findIndex((s) => s.defaultOpen);
   const [openDesktop, setOpenDesktop] = useState(

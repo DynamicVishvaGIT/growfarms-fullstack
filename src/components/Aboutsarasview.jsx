@@ -5,7 +5,19 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import blobShape from "../assets/images/sp_2_notext.png";
 import farmPhoto from "../assets/images/sp_1.png";
 
+import { useProject } from "../context/projectContext";
+import { withLineBreaks } from "../lib/richText";
+
 gsap.registerPlugin(ScrollTrigger);
+
+/** The designed copy, kept as the fallback for anything left blank in the CMS. */
+const FALLBACK_BODY =
+  "Sarasview by Grow Farms is a sprawling 140-acre residential farmland " +
+  "development located in the peaceful surroundings of Aptavane Village, just " +
+  "2 km away from the historic Pali city in Maharashtra. This project provides " +
+  "an ideal opportunity for nature lovers and investors alike to own a piece of " +
+  "pristine land. It offers scenic river-touch plots, making it a perfect " +
+  "retreat for those who seek tranquility, yet desire modern conveniences close by.";
 
 const AboutSarasview = () => {
   const sectionRef = useRef(null);
@@ -13,6 +25,15 @@ const AboutSarasview = () => {
   const blobRef    = useRef(null);
   const headingRef = useRef(null);
   const bodyRef    = useRef(null);
+
+  const project = useProject();
+
+  // Each project writes its own About block; anything left blank falls back to
+  // the designed copy, so an unedited project renders exactly as it does today.
+  const projectName = project?.title || "Sarasview";
+  const heading = project?.about_title || `About\n${projectName}\nProject`;
+  const body    = project?.about_body  || FALLBACK_BODY;
+  const photo   = project?.about_image_url || farmPhoto;
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -214,8 +235,8 @@ const AboutSarasview = () => {
           {/* LEFT / TOP — farm photo */}
           <div ref={photoRef} className="asv-photo-wrap">
             <img
-              src={farmPhoto}
-              alt="Sarasview farmland — rolling green hills near Pali, Maharashtra"
+              src={photo}
+              alt={`${projectName} farmland — rolling green hills near Pali, Maharashtra`}
               className="asv-photo"
             />
           </div>
@@ -232,19 +253,10 @@ const AboutSarasview = () => {
 
             <div className="asv-blob-text">
               <h2 ref={headingRef} className="asv-heading">
-                About<br />
-                Sarasview<br />
-                Project
+                {withLineBreaks(heading)}
               </h2>
               <p ref={bodyRef} className="asv-body">
-                Sarasview by Grow Farms is a sprawling 140-acre residential
-                farmland development located in the peaceful surroundings of
-                Aptavane Village, just 2 km away from the historic Pali city
-                in Maharashtra. This project provides an ideal opportunity for
-                nature lovers and investors alike to own a piece of pristine
-                land. It offers scenic river-touch plots, making it a perfect
-                retreat for those who seek tranquility, yet desire modern
-                conveniences close by.
+                {withLineBreaks(body)}
               </p>
             </div>
           </div>

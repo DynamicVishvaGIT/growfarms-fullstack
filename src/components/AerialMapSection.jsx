@@ -4,13 +4,19 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import home_banner_2 from "../assets/images/home_banner_2.jpg";
 import { useNavigate } from "react-router-dom";
 import EnquiryModal from "./EnquiryModal";
+import useApiData from "../hooks/useApiData";
+import { getMapPins } from "../lib/api";
 
 gsap.registerPlugin(ScrollTrigger);
 
 // FIX: must match HomeBanner's BG_COLOR exactly
 const BG_COLOR = "#163f1f";
 
-const pins = [
+/**
+ * The original hard-coded pins. These stay as the fallback so the map still
+ * renders exactly as designed when the backend is unavailable.
+ */
+const FALLBACK_PINS = [
   {
     id: "skybreez",
     label: "Skybreez",
@@ -55,11 +61,43 @@ const pins = [
 
 const ZOOM_SCALE = 1.3;
 
+/**
+ * Reshape an API project into the exact pin shape this component already
+ * works with, so nothing below here has to change.
+ */
+function toPin(project) {
+  return {
+    id: project.slug,
+    label: project.title,
+    slug: project.slug,
+    imgTop: Number(project.map_pin_top) || 0,
+    imgLeft: Number(project.map_pin_left) || 0,
+    desc: project.short_description || "",
+    fullDesc: project.full_description || project.short_description || "",
+    image: project.hero_image_url || FALLBACK_PINS[0].image,
+  };
+}
+
 export default function AerialMapSection() {
   const [activePin, setActivePin] = useState(null);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
+
+  const { data: pins } = useApiData(
+    async (signal) => {
+      const rows = await getMapPins(signal);
+      if (!rows) return null;
+      // A project with no coordinates would land at 0,0 — skip it rather than
+      // stacking pins in the corner.
+      const usable = rows.filter(
+        (r) => r.map_pin_top !== null && r.map_pin_left !== null,
+      );
+      return usable.length ? usable.map(toPin) : null;
+    },
+    FALLBACK_PINS,
+  );
+
   const [displayPositions, setDisplayPositions] = useState(() =>
-    pins.map((p) => ({ left: p.imgLeft, top: p.imgTop })),
+    FALLBACK_PINS.map((p) => ({ left: p.imgLeft, top: p.imgTop })),
   );
 
   const sectionRef = useRef(null);
@@ -111,7 +149,7 @@ export default function AerialMapSection() {
 
   const recalcPositions = useCallback(() => {
     setDisplayPositions(pins.map((p) => getPinDisplayPercent(p)));
-  }, [getPinDisplayPercent]);
+  }, [getPinDisplayPercent, pins]);
 
   useEffect(() => {
     recalcPositions();
@@ -141,6 +179,7 @@ export default function AerialMapSection() {
       if (!viewport || !map) return;
 
       const pin = pins[pinIndex];
+      if (!pin) return;
       const { left: pinLeftPct, top: pinTopPct } = getPinDisplayPercent(pin);
 
       const mapW = map.offsetWidth;
@@ -162,7 +201,7 @@ export default function AerialMapSection() {
         },
       });
     },
-    [clampPan, getPinDisplayPercent],
+    [clampPan, getPinDisplayPercent, pins],
   );
 
   // ── Zoom out ──────────────────────────────────────────────────────────────
@@ -547,7 +586,7 @@ export default function AerialMapSection() {
               </div>
               <div className="flex gap-3 mt-auto">
                 <button
-                  onClick={() => navigate("/details")}
+                  onClick={() => navigate(`/details/${displayPin.slug || displayPin.id}`)}
                   className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium
                     transition-all duration-200 hover:opacity-90"
                   style={{ background: "#315537" }}
@@ -661,7 +700,7 @@ export default function AerialMapSection() {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => navigate("/details")}
+                  onClick={() => navigate(`/details/${displayPin.slug || displayPin.id}`)}
                   className="flex-1 py-3 rounded-xl text-white text-sm font-medium
                     active:opacity-80 transition-opacity"
                   style={{ background: "#315537" }}

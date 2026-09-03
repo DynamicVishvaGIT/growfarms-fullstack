@@ -3,13 +3,31 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import palilandscape from "../assets/images/newlandscapeimg.png"
 
+import { useProject } from "../context/projectContext";
+import { withLineBreaks } from "../lib/richText";
+
 gsap.registerPlugin(ScrollTrigger);
+
+/** The designed copy, kept as the fallback for anything left blank in the CMS. */
+const FALLBACK_BODY =
+  "Sarasview by Grow Farms is a sprawling 140-acre residential farmland " +
+  "development located in the peaceful surroundings of Aptavane Village, just " +
+  "2 km away from the historic Pali city in Maharashtra. This project provides " +
+  "an ideal opportunity for nature lovers and investors alike to own a piece of " +
+  "pristine land. It offers scenic river-touch plots, making it a perfect " +
+  "retreat for those who seek tranquility, yet desire modern conveniences close by.";
 
 const InvestInPaliSection = () => {
   const sectionRef = useRef(null);
   const headingRef = useRef(null);
   const paragraphRef = useRef(null);
   const imageRef = useRef(null);
+
+  const project = useProject();
+
+  const heading = project?.invest_title || "Why should\ninvest in Pali";
+  const body = project?.invest_body || FALLBACK_BODY;
+  const landscape = project?.invest_image_url || palilandscape;
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -61,8 +79,7 @@ const InvestInPaliSection = () => {
             ref={headingRef}
             className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.15] text-[#D4AF37] mt-10 tracking-wide font-medium"
           >
-            Why should <br className="hidden sm:block" />
-            invest in Pali
+            {withLineBreaks(heading, "hidden sm:block")}
           </h2>
         </div>
 
@@ -72,13 +89,7 @@ const InvestInPaliSection = () => {
             ref={paragraphRef}
             className="text-gray-200 text-sm sm:text-base md:text-[15px] lg:text-base leading-relaxed sm:leading-loose font-light max-w-2xl"
           >
-            Sarasview by Grow Farms is a sprawling 140-acre residential farmland
-            development located in the peaceful surroundings of Aptavane Village,
-            just 2 km away from the historic Pali city in Maharashtra. This project
-            provides an ideal opportunity for nature lovers and investors alike to own
-            a piece of pristine land. It offers scenic river-touch plots, making it a
-            perfect retreat for those who seek tranquility, yet desire modern
-            conveniences close by.
+            {withLineBreaks(body)}
           </p>
         </div>
 
@@ -93,7 +104,7 @@ const InvestInPaliSection = () => {
         {/* Landscape Image */}
         <div ref={imageRef} className="w-full overflow-hidden">
           <img
-          src={palilandscape}
+          src={landscape}
           alt="Valley and landscape"
           className="w-full h-[200px]  sm:h-[420px] md:h-[500px] lg:h-[380px] object-cover object-bottom"
           />

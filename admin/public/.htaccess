@@ -1,0 +1,25 @@
+# Grow Farms admin panel — served from https://growfarms.com/admin
+#
+# Apache does not merge a parent .htaccess's rewrite rules into a child's, so
+# the SPA fallback has to be repeated here with /admin as its base. Without it
+# a refresh on /admin/projects falls through to the public site's index.html
+# and renders the website instead of the panel.
+#
+# Vite copies this file out of public/ into dist/ on every build.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /admin/
+
+  RewriteRule ^index\.html$ - [L]
+
+  # Anything that is not a real file or folder is a client-side route.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /admin/index.html [L]
+</IfModule>
+
+# The panel is private; keep it out of search results even if a link leaks.
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow"
+</IfModule>

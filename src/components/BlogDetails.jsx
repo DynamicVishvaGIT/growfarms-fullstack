@@ -8,16 +8,20 @@ import farmImg1 from "../assets/images/farm_couple_1.jpg"; // ⚠️ swap for yo
 import farmImg2 from "../assets/images/farm_couple_1.jpg";
 import blogThumb from "../assets/images/Blog_Banner_2.jpeg"; // ⚠️ swap for the mountain-lake image
 
+import { useParams, useNavigate } from "react-router-dom";
+import useApiData from "../hooks/useApiData";
+import { getBlog, getBuyingSteps } from "../lib/api";
+
 gsap.registerPlugin(ScrollTrigger);
 
-const checklist = [
+const FALLBACK_CHECKLIST = [
   "Make ridges when planting crops on your farm of flat land.",
   "Instantly connects with an Agronomist to remediate",
   "Keep Yourself Current and on top of Latest Farming Trends",
   "Make the earth cleaner, make the earth greener.",
 ];
 
-const steps = [
+const FALLBACK_STEPS = [
   {
     n: "01",
     title: "Choose Your Plot",
@@ -35,7 +39,7 @@ const steps = [
   },
 ];
 
-const otherBlogs = [
+const FALLBACK_OTHER_BLOGS = [
   {
     image: blogThumb,
     category: "Mixed Farming",
@@ -112,9 +116,57 @@ const ArrowIcon = () => (
   </svg>
 );
 
+/** Match the uppercase meta line the related-post cards already use. */
+function formatMetaDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
 const BlogDetails = () => {
   /* ---------- Hero mount animation (unchanged) ---------- */
   const [heroVisible, setHeroVisible] = useState(false);
+
+  const { slug } = useParams();
+  const navigate = useNavigate();
+
+  // Without a slug this stays exactly the static article it is today.
+  const { data: post } = useApiData(
+    (signal) => (slug ? getBlog(slug, signal) : null),
+    null,
+    [slug],
+  );
+
+  const checklist = post?.checklist?.length
+    ? post.checklist.map((c) => c.item_text)
+    : FALLBACK_CHECKLIST;
+
+  const { data: steps } = useApiData(
+    async (signal) => {
+      const rows = await getBuyingSteps({ scope: "blog" }, signal);
+      if (!rows?.length) return null;
+      return rows.map((r) => ({
+        n: r.step_number,
+        title: r.title,
+        desc: r.description || "",
+      }));
+    },
+    FALLBACK_STEPS,
+  );
+
+  const otherBlogs = post?.related?.length
+    ? post.related.map((r) => ({
+        slug: r.slug,
+        image: r.featured_image_url || FALLBACK_OTHER_BLOGS[0].image,
+        category: r.category?.name || "Mixed Farming",
+        date: formatMetaDate(r.published_at) || FALLBACK_OTHER_BLOGS[0].date,
+        title: r.title,
+      }))
+    : FALLBACK_OTHER_BLOGS;
+
+  const bannerImage = post?.banner_image_url || post?.featured_image_url || BlogBanner;
+  const postTitle = post?.title || "Better Agriculture for a Better Future";
 
   useEffect(() => {
     const t = requestAnimationFrame(() => {
@@ -286,7 +338,7 @@ const BlogDetails = () => {
         <div className="relative w-full h-full">
           {/* Hero Image */}
           <img
-            src={BlogBanner}
+            src={bannerImage}
             alt="Blog Banner"
             fetchPriority="high"
             className="
@@ -378,7 +430,7 @@ const BlogDetails = () => {
                   transitionDelay: "150ms",
                 }}
               >
-                Better Agriculture for a Better Future
+                {postTitle}
               </h1>
 
               <p
@@ -435,7 +487,7 @@ const BlogDetails = () => {
           {/* Intro text block */}
           <div ref={detailsRef}>
             <h1 className="font-display text-2xl sm:text-4xl lg:text-[2.75rem] font-medium leading-tight text-[#F4EDE1] max-w-4xl">
-              Better Agriculture for Better Future
+              {post?.title || "Better Agriculture for Better Future"}
             </h1>
 
             <div className="mt-5 space-y-4 max-w-3xl lg:max-w-6xl text-[#D8CFBB] text-[14px] sm:text-[15px] lg:text-base leading-relaxed">
@@ -573,7 +625,11 @@ const BlogDetails = () => {
 
           <div className="mt-10 sm:mt-14 max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
             {otherBlogs.map((blog, i) => (
-              <article key={i} className="group">
+              <article
+                key={i}
+                className="group cursor-pointer"
+                onClick={() => blog.slug && navigate(`/blog-details/${blog.slug}`)}
+              >
                 <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-xl shadow-black/20">
                   <img
                     src={blog.image}

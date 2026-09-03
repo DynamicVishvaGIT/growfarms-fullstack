@@ -1,7 +1,14 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
   RewriteRule ^index\.html$ - [L]
+
+  # The admin panel is a second SPA living in /admin with its own .htaccess.
+  # Hand those requests over untouched, or /admin/projects would be rewritten
+  # to the website's index.html and the panel would never load.
+  RewriteRule ^admin(/|$) - [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]

@@ -15,6 +15,8 @@
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import useApiData from '../hooks/useApiData';
+import { getPhilosophyCards } from '../lib/api';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -47,7 +49,7 @@ const ValuesIcon = () => (
   </svg>
 );
 
-const cards = [
+const FALLBACK_CARDS = [
   {
     Icon: MissionIcon,
     title: 'Mission',
@@ -65,7 +67,23 @@ const cards = [
   },
 ];
 
+/** Icons stay in code so the section keeps its exact hand-drawn glyphs. */
+const ICONS = { mission: MissionIcon, vision: VisionIcon, values: ValuesIcon };
+
 export default function CorePhilosophy() {
+  const { data: cards } = useApiData(
+    async (signal) => {
+      const rows = await getPhilosophyCards(signal);
+      if (!rows?.length) return null;
+      return rows.map((r, i) => ({
+        Icon: ICONS[r.icon_key] || FALLBACK_CARDS[i % FALLBACK_CARDS.length].Icon,
+        title: r.title,
+        body: r.body || '',
+      }));
+    },
+    FALLBACK_CARDS,
+  );
+
   const sectionRef  = useRef(null);
   const headingRef  = useRef(null);
   const subtitleRef = useRef(null);

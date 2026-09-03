@@ -63,7 +63,12 @@ const App = () => {
 
           <Route path="/details" element={<Details />} />
 
+          {/* Each project gets its own page; /details alone shows the featured one. */}
+          <Route path="/details/:slug" element={<Details />} />
+
           <Route path="/blog-details" element={<BlogDetails />} />
+
+          <Route path="/blog-details/:slug" element={<BlogDetails />} />
         </Routes>
 
         <FooterSection />

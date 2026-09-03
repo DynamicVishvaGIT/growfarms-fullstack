@@ -14,10 +14,12 @@ import img7 from "../assets/images/Blog_Banner_2.jpeg";
 import img8 from "../assets/images/Blog_Banner_2.jpeg";
 import img9 from "../assets/images/Blog_Banner_2.jpeg";
 import { useNavigate } from "react-router-dom";
+import useApiData from "../hooks/useApiData";
+import { getBlogs } from "../lib/api";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const posts = [
+const FALLBACK_POSTS = [
   { id: 1, img: img1, title: "Better Agriculture for Better Future" },
   { id: 2, img: img2, title: "A farmer is a person who works in agriculture." },
   { id: 3, img: img3, title: "A farmer is a person who works in agriculture." },
@@ -58,7 +60,7 @@ const ArrowIcon = () => (
 );
 
 // ── blog card ────────────────────────────────────────────────────────────────
-const BlogCard = ({ img, title }) => {
+const BlogCard = ({ img, title, category, date, author, slug }) => {
   const badgeRef = useRef(null);
   const fabRef   = useRef(null);
   const imgRef   = useRef(null);
@@ -110,7 +112,7 @@ const BlogCard = ({ img, title }) => {
       className="flex flex-col gap-2 cursor-pointer"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onClick={()=> navigate("/blog-details")}
+      onClick={() => navigate(slug ? `/blog-details/${slug}` : "/blog-details")}
     >
       <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
         <img
@@ -124,7 +126,7 @@ const BlogCard = ({ img, title }) => {
           ref={badgeRef}
           className="absolute top-3 left-3 bg-[#2d5a27] text-white text-[10px] font-semibold tracking-widest uppercase px-3 py-1 rounded-full will-change-transform origin-left"
         >
-          Mixed Farming
+          {category || "Mixed Farming"}
         </span>
 
         <button
@@ -140,11 +142,11 @@ const BlogCard = ({ img, title }) => {
       <div className="flex items-center gap-3 text-[11px] text-[#d4cfc9]">
         <span className="flex items-center gap-1">
           <CalendarIcon />
-          MARCH 28, 2024
+          {date || "MARCH 28, 2024"}
         </span>
         <span className="flex items-center gap-1">
           <PersonIcon />
-          ADMIN
+          {author || "ADMIN"}
         </span>
       </div>
 
@@ -154,10 +156,37 @@ const BlogCard = ({ img, title }) => {
 };
 
 // ── main component ────────────────────────────────────────────────────────────
+/** The card's date line is upper-case, so format to match the design. */
+function formatCardDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d
+    .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    .toUpperCase();
+}
+
 const Blogs = () => {
   const [heroVisible, setHeroVisible] = useState(false);
   const gridRef    = useRef(null);
   const viewAllRef = useRef(null);
+
+  const { data: posts } = useApiData(
+    async (signal) => {
+      const rows = await getBlogs({ limit: 12 }, signal);
+      if (!rows?.length) return null;
+      return rows.map((b) => ({
+        id: b.id,
+        slug: b.slug,
+        img: b.featured_image_url || FALLBACK_POSTS[0].img,
+        title: b.title,
+        category: b.category?.name,
+        date: formatCardDate(b.published_at || b.created_at),
+        author: (b.author_name || "Admin").toUpperCase(),
+      }));
+    },
+    FALLBACK_POSTS,
+  );
 
   // Hero entrance
   useEffect(() => {
@@ -288,7 +317,14 @@ const Blogs = () => {
         >
           {posts.map((post) => (
             <div key={post.id} className="blog-card" style={{ opacity: 0 }}>
-              <BlogCard img={post.img} title={post.title} />
+              <BlogCard
+                img={post.img}
+                title={post.title}
+                category={post.category}
+                date={post.date}
+                author={post.author}
+                slug={post.slug}
+              />
             </div>
           ))}
         </div>

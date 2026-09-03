@@ -15,6 +15,8 @@ import {
   compactErrors,
   fieldClass,
 } from "../lib/validation";
+import { submitEnquiry, toFormErrors, getSettings, getContent, contentBlock } from "../lib/api";
+import useApiData from "../hooks/useApiData";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -67,7 +69,7 @@ function Field({ as: Tag = "input", error, name, className = "", ...props }) {
   );
 }
 
-const infoCards = [
+const FALLBACK_INFO_CARDS = [
   {
     icon: Mail,
     title: "Mail us 24/7",
@@ -88,9 +90,81 @@ const infoCards = [
   },
 ];
 
+/** Icon components keyed by the name stored against each contact card. */
+const CARD_ICONS = { mail: Mail, phone: Phone, map: MapPin };
+
+/**
+ * The location card is designed as two lines. Split a stored one-line address
+ * near its middle comma so it keeps that shape whatever the admin types.
+ */
+function splitAddress(address) {
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return [address];
+  const mid = Math.ceil(parts.length / 2);
+  return [parts.slice(0, mid).join(", "), parts.slice(mid).join(", ")];
+}
+
+const FALLBACK_MAP_EMBED =
+  "https://www.google.com/maps?q=Mumbai,Maharashtra,India&output=embed";
+
 const Contact = () => {
   /* ---------- Page-wide ref (scopes the GSAP context) ---------- */
   const pageRef = useRef(null);
+
+  // Contact details live in Settings; the three-card layout itself comes from
+  // the contact page's content block, so both stay editable.
+  const { data: infoCards } = useApiData(async (signal) => {
+    const [settings, grouped] = await Promise.all([
+      getSettings(signal),
+      getContent("contact", signal),
+    ]);
+    if (!settings && !grouped) return null;
+
+    const stored = contentBlock(grouped, "contact", "info_cards")?.extra_data?.cards;
+
+    if (settings) {
+      const emails = [settings.contact_email_1, settings.contact_email_2].filter(Boolean);
+      const phones = [settings.contact_phone_1, settings.contact_phone_2].filter(Boolean);
+      const address = settings.contact_address;
+
+      if (emails.length || phones.length || address) {
+        return [
+          {
+            icon: Mail,
+            title: stored?.[0]?.title || "Mail us 24/7",
+            lines: emails.length ? emails : FALLBACK_INFO_CARDS[0].lines,
+          },
+          {
+            icon: Phone,
+            title: stored?.[1]?.title || "Call us 24/7",
+            lines: phones.length ? phones : FALLBACK_INFO_CARDS[1].lines,
+          },
+          {
+            icon: MapPin,
+            title: stored?.[2]?.title || "Our Locations",
+            // The footer renders the address as one line; the card splits it
+            // across two the way the design does.
+            lines: address ? splitAddress(address) : FALLBACK_INFO_CARDS[2].lines,
+          },
+        ];
+      }
+    }
+
+    if (stored?.length) {
+      return stored.map((c, i) => ({
+        icon: CARD_ICONS[c.icon] || FALLBACK_INFO_CARDS[i]?.icon || Mail,
+        title: c.title,
+        lines: c.lines || [],
+      }));
+    }
+
+    return null;
+  }, FALLBACK_INFO_CARDS);
+
+  const { data: mapEmbed } = useApiData(async (signal) => {
+    const settings = await getSettings(signal);
+    return settings?.google_map_embed || null;
+  }, FALLBACK_MAP_EMBED);
 
   /* ---------- Section-level refs — same granularity as About.jsx ---------- */
   const cardsWrapRef = useRef(null); // whole info-cards grid, one block
@@ -109,6 +183,8 @@ const Contact = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
   /* ---------- GSAP ScrollTrigger — About.jsx-style section reveals ---------- */
   useLayoutEffect(() => {
@@ -256,6 +332,7 @@ const Contact = () => {
     const next = { ...form, [name]: value };
     setForm(next);
     if (sent) setSent(false);
+    if (sendError) setSendError("");
 
     // Only re-validate live once the field has been visited, so the user is
     // not scolded mid-keystroke on their first pass through the form.
@@ -270,8 +347,9 @@ const Contact = () => {
     setErrors((prev) => ({ ...prev, [name]: validateField(name, form) }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (sending) return;
 
     const next = compactErrors(
       Object.fromEntries(FIELD_ORDER.map((f) => [f, validateField(f, form)])),
@@ -297,10 +375,46 @@ const Contact = () => {
       { scale: 1, duration: 0.4, ease: "elastic.out(1, 0.4)" },
     );
 
-    // TODO: post to the real contact endpoint once it exists.
-    setSent(true);
-    setForm(EMPTY_FORM);
-    setTouched({});
+    setSending(true);
+    setSendError("");
+
+    try {
+      await submitEnquiry({
+        source: "contact_page",
+        first_name: form.firstName.trim(),
+        last_name: form.lastName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        message: form.message.trim(),
+      });
+
+      setSent(true);
+      setForm(EMPTY_FORM);
+      setTouched({});
+    } catch (err) {
+      // The API keys its errors by snake_case field names; map them back onto
+      // the camelCase names this form uses.
+      const fieldErrors = toFormErrors(err, {
+        first_name: "firstName",
+        last_name: "lastName",
+      });
+
+      if (Object.keys(fieldErrors).length) {
+        setErrors(fieldErrors);
+        const firstBad = FIELD_ORDER.find((f) => fieldErrors[f]);
+        if (firstBad) formElRef.current?.querySelector(`[name="${firstBad}"]`)?.focus();
+      } else {
+        setSendError(err.message || "Something went wrong. Please try again.");
+      }
+
+      gsap.fromTo(
+        formElRef.current,
+        { x: -8 },
+        { x: 0, duration: 0.45, ease: "elastic.out(1, 0.35)" },
+      );
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -507,13 +621,20 @@ const Contact = () => {
                 <button
                   ref={buttonRef}
                   type="submit"
+                  disabled={sending}
                   onMouseEnter={handleButtonEnter}
                   onMouseLeave={handleButtonLeave}
-                  className="mt-1 cursor-pointer flex w-fit items-center gap-2 rounded-full bg-[#315537] py-3.5 pl-7 pr-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]"
+                  className="mt-1 cursor-pointer flex w-fit items-center gap-2 rounded-full bg-[#315537] py-3.5 pl-7 pr-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Send Message
+                  {sending ? "Sending…" : "Send Message"}
                   <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
                 </button>
+
+                {sendError && (
+                  <p role="alert" className="text-sm text-red-600">
+                    {sendError}
+                  </p>
+                )}
 
                 {sent && (
                   <p
@@ -535,7 +656,7 @@ const Contact = () => {
         {/* Iframe */}
         <div className="relative h-[420px] w-full sm:h-[500px]">
           <iframe
-            src="https://www.google.com/maps?q=Mumbai,Maharashtra,India&output=embed"
+            src={mapEmbed}
             width="100%"
             height="500px"
             style={{ border: 0 }}

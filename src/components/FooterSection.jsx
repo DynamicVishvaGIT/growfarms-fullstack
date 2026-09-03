@@ -1,6 +1,47 @@
+import { Link } from "react-router-dom";
 import logo_img from "../assets/images/grow-farms-logo.png";
+import useApiData from "../hooks/useApiData";
+import { getContent, getSettings, contentBlock } from "../lib/api";
+
+/* The footer as it ships today — every value below is the fallback. */
+const FALLBACK_FOOTER = {
+  watermark: "GROW FARMS",
+  navigation: [
+    { label: "Home", url: "/" },
+    { label: "About us", url: "/about" },
+    { label: "Testimonials", url: "/testimonials" },
+    { label: "Blog", url: "/blogs" },
+  ],
+  projects: [
+    { label: "Sky Breeze", url: "/details/skybreez" },
+    { label: "Sarasview", url: "/details/sarasview" },
+  ],
+  address:
+    "Grow Farms 305, The Landmark, Next to Hotel Three Star, Sector 7, Kharghar, Navi Mumbai, Maharashtra 410210",
+  copyright: "©2026 Grow Farms. All rights reserved.",
+};
 
 const FooterSection = () => {
+  const { data: footer } = useApiData(async (signal) => {
+    const [grouped, settings] = await Promise.all([
+      getContent("global", signal),
+      getSettings(signal),
+    ]);
+
+    const block = contentBlock(grouped, "global", "footer");
+    if (!block && !settings) return null;
+
+    const extra = block?.extra_data || {};
+    return {
+      watermark: block?.title || FALLBACK_FOOTER.watermark,
+      navigation: extra.navigation?.length ? extra.navigation : FALLBACK_FOOTER.navigation,
+      projects: extra.projects?.length ? extra.projects : FALLBACK_FOOTER.projects,
+      address: settings?.contact_address || block?.body || FALLBACK_FOOTER.address,
+      copyright: settings?.copyright_text || extra.copyright || FALLBACK_FOOTER.copyright,
+      logo: settings?.site_logo || null,
+    };
+  }, FALLBACK_FOOTER);
+
   return (
     <footer className="relative w-full sub_font overflow-hidden bg-[#224E28]">
       {/* Watermark — original untouched styling */}
@@ -13,7 +54,7 @@ const FooterSection = () => {
           letterSpacing: "0.1em",
         }}
       >
-        GROW FARMS
+        {footer.watermark}
       </p>
 
       {/* Content */}
@@ -27,7 +68,7 @@ const FooterSection = () => {
           {/* Logo — full width on mobile */}
           <div className="col-span-2 md:col-span-1 flex flex-col items-start">
             <img
-              src={logo_img}
+              src={footer.logo || logo_img}
               alt="Grow Farms"
               className="h-[70px] w-auto object-contain"
             />
@@ -42,14 +83,14 @@ const FooterSection = () => {
               Navigation
             </h3>
             <ul className="space-y-2.5">
-              {["Home", "About us", "Testimonials", "Blog"].map((item) => (
-                <li key={item}>
-                  <a
-                    href="#"
+              {footer.navigation.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    to={item.url || "/"}
                     className="text-white/65 text-sm hover:text-white transition-colors duration-200"
                   >
-                    {item}
-                  </a>
+                    {item.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -64,14 +105,14 @@ const FooterSection = () => {
               Our Projects
             </h3>
             <ul className="space-y-2.5">
-              {["Sky Breeze", "Sarasview"].map((item) => (
-                <li key={item}>
-                  <a
-                    href="#"
+              {footer.projects.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    to={item.url || "/"}
                     className="text-white/65 text-sm hover:text-white transition-colors duration-200"
                   >
-                    {item}
-                  </a>
+                    {item.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -86,8 +127,7 @@ const FooterSection = () => {
               Reach to us
             </h3>
             <p className="text-white/65 text-sm leading-7 max-w-[300px]">
-              Grow Farms 305, The Landmark, Next to Hotel Three Star,
-              Sector 7, Kharghar, Navi Mumbai, Maharashtra 410210
+              {footer.address}
             </p>
           </div>
 
@@ -96,7 +136,7 @@ const FooterSection = () => {
         {/* Divider + Copyright */}
         <div className="relative bottom-5 lg:bottom-15">
           <p className="text-center text-[10px] text-white tracking-widest uppercase">
-            ©2026 Grow Farms. All rights reserved.
+            {footer.copyright}
           </p>
         </div>
 

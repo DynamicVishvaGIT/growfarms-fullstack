@@ -1,17 +1,24 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import logo from "/logo_1.png";
+import useApiData from "../hooks/useApiData";
+import { getContent, contentBlock } from "../lib/api";
+
+const FALLBACK_MENU = [
+  { name: "Home", path: "/" },
+  { name: "About Us", path: "/about" },
+  { name: "Blogs", path: "/blogs" },
+  { name: "Contact Us", path: "/contact" },
+];
 
 const ExploreButton = () => {
   const [navOpen, setNavOpen] = useState(false);
 
-  const menuItems = [
-    { name: "Home", path: "/" },
-    { name: "About Us", path: "/about" },
-    { name: "Blogs", path: "/blogs" },
-    // { name: "Testimonials", path: "/testimonials" },
-    { name: "Contact Us", path: "/contact" },
-  ];
+  const { data: menuItems } = useApiData(async (signal) => {
+    const grouped = await getContent("global", signal);
+    const items = contentBlock(grouped, "global", "navigation")?.extra_data?.items;
+    return items?.length ? items : null;
+  }, FALLBACK_MENU);
 
   return (
     <div
