@@ -9,15 +9,12 @@ services:
 
     restart: unless-stopped
 
+    env_file:
+      - ./backend/.env
+
     environment:
       NODE_ENV: production
       PORT: 5000
-
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: root
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: growfarms_db
 
     ports:
       - "5000:5000"
