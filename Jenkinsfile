@@ -10,13 +10,14 @@ pipeline {
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[
-                        url: 'https://github.com/DynamicVishvaGIT/growfarms-fullstack.git'
+                        url: 'https://github.com/DynamicVishvaGIT/growfarms-fullstack.git',
+                        credentialsId: 'github-token'
                     ]]
                 ])
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Images') {
             steps {
                 sh '''
                     docker compose build
@@ -24,16 +25,23 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Stop Old Containers') {
             steps {
                 sh '''
                     docker compose down || true
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
                     docker compose up -d
                 '''
             }
         }
 
-        stage('Verify') {
+        stage('Verify Deployment') {
             steps {
                 sh '''
                     docker compose ps
@@ -49,8 +57,9 @@ pipeline {
     }
 
     post {
+
         success {
-            echo 'GrowFarms deployment completed successfully.'
+            echo 'GrowFarms deployment successful.'
         }
 
         failure {
