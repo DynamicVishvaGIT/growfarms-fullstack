@@ -17,7 +17,23 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Verify Source') {
+            steps {
+                sh '''
+                    echo "===== PROJECT ====="
+                    pwd
+                    ls -la
+
+                    echo "===== BACKEND ====="
+                    ls -la backend
+
+                    echo "===== FRONTEND ====="
+                    ls -la src
+                '''
+            }
+        }
+
+        stage('Build Images') {
             steps {
                 sh '''
                     docker compose build
@@ -41,7 +57,7 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify') {
             steps {
                 sh '''
                     docker compose ps
@@ -57,7 +73,6 @@ pipeline {
     }
 
     post {
-
         success {
             echo 'GrowFarms deployment successful.'
         }
