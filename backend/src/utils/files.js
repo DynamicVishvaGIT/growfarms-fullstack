@@ -8,12 +8,20 @@ const env = require("../config/env");
  * Turn a stored relative path ("uploads/projects/x.png") into the absolute URL
  * the browser should request. Values that are already absolute, or that point
  * at the frontend's own bundled assets, are passed through untouched.
+ *
+ * The API prefix is part of the URL on purpose. In production the panel and the
+ * website are same-origin with the API, and the host only routes `/api/*` to
+ * this process — a bare `/uploads/...` lands on the static site instead and
+ * comes back as the SPA's index.html, so every image would render broken.
+ * Serving them under the prefix means images ride the one route that is known
+ * to reach us, on any host, with no extra proxy rule. app.js mounts the same
+ * folder at both paths, so URLs handed out before this change still resolve.
  */
 function toPublicUrl(storedPath) {
   if (!storedPath) return null;
   if (/^https?:\/\//i.test(storedPath)) return storedPath;
   const clean = String(storedPath).replace(/^\/+/, "");
-  return `${env.publicUrl}/${clean}`;
+  return `${env.publicUrl}${env.apiPrefix}/${clean}`;
 }
 
 /** Map over an object's image-ish fields, converting each to a public URL. */

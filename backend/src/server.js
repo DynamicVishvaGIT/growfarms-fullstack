@@ -20,7 +20,7 @@ async function start() {
     console.log(`  Grow Farms API`);
     console.log(`  env      ${env.nodeEnv}`);
     console.log(`  api      ${env.publicUrl}${env.apiPrefix}`);
-    console.log(`  uploads  ${env.publicUrl}/${env.upload.dir}`);
+    console.log(`  uploads  ${env.publicUrl}${env.apiPrefix}/${env.upload.dir}`);
     console.log(`  cors     ${env.corsOrigins.join(", ")}`);
     console.log("");
   });

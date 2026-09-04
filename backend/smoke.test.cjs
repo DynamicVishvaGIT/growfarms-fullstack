@@ -173,8 +173,29 @@ async function main() {
   check("uploads send nosniff", res.headers.get("x-content-type-options") === "nosniff");
   check("image content-type is correct", (res.headers.get("content-type") || "").startsWith("image/"));
 
+  // The path production actually uses. Only /api/* is routed to this process
+  // on the live host, so if this mount ever goes away every image on the site
+  // silently turns into the static site's index.html.
+  const prefixed = await fetch(`${base}${env.apiPrefix}/${env.upload.dir}/seed/grow-farms-logo.png`);
+  check("the same image is served under the API prefix", prefixed.status === 200, `got ${prefixed.status}`);
+  check(
+    "the prefixed mount serves it as an image, not HTML",
+    (prefixed.headers.get("content-type") || "").startsWith("image/"),
+    `got ${prefixed.headers.get("content-type")}`,
+  );
+
+  const missing = await fetch(`${base}${env.apiPrefix}/${env.upload.dir}/seed/no-such-file.png`);
+  check("a missing image 404s rather than falling through", missing.status === 404, `got ${missing.status}`);
+
   const traversal = await fetch(`${base}/${env.upload.dir}/../package.json`);
   check("path traversal out of uploads is blocked", traversal.status !== 200, `got ${traversal.status}`);
+
+  const prefixedTraversal = await fetch(`${base}${env.apiPrefix}/${env.upload.dir}/../../package.json`);
+  check(
+    "path traversal out of the prefixed mount is blocked",
+    prefixedTraversal.status !== 200,
+    `got ${prefixedTraversal.status}`,
+  );
 
   console.log("\n── Security headers ─────────────────────────────────────────");
 

@@ -9,6 +9,13 @@
   # to the website's index.html and the panel would never load.
   RewriteRule ^admin(/|$) - [L]
 
+  # The API and the uploaded images it serves live at /api and /uploads and are
+  # proxied to the Node process. They must never reach the fallback below: a
+  # missed image would come back as 200 index.html instead of a 404, so <img>
+  # tags render broken and fetch() parses HTML as JSON. Leaving them here means
+  # a real failure looks like a failure.
+  RewriteRule ^(api|uploads)(/|$) - [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]

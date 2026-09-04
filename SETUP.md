@@ -84,7 +84,7 @@ Copy `backend/.env.example` and fill it in:
 NODE_ENV=development
 PORT=5000
 API_PREFIX=/api
-PUBLIC_URL=http://localhost:5000        # used to build absolute image URLs
+PUBLIC_URL=http://localhost:5000        # origin only, no /api - see note below
 
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -119,10 +119,17 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 The server refuses to start in production if `JWT_SECRET` is under 32 characters.
 
+`PUBLIC_URL` is the origin the browser reaches the API on, **without** `/api`.
+Image URLs are built as `PUBLIC_URL` + `API_PREFIX` + `/uploads/…`, so a seed
+image comes back as `http://localhost:5000/api/uploads/seed/x.jpg`. Uploads are
+served at `/uploads` **and** `/api/uploads`; the prefixed one is what production
+uses, because the host routes only `/api/*` to Node — see §9.
+
 ### `admin/.env`
 
 ```ini
 VITE_API_URL=http://localhost:5000/api
+VITE_SITE_URL=http://localhost:5173     # the panel's "View site" link
 ```
 
 ### `.env` (website, repo root)
@@ -133,6 +140,15 @@ VITE_API_URL=http://localhost:5000/api
 
 > Vite only exposes variables prefixed `VITE_`, and it **inlines them at build
 > time** — after changing either `.env`, restart the dev server or rebuild.
+
+**These two files are for development only.** Production values live in
+`.env.production` and `admin/.env.production`, which are committed and which
+Vite loads for `npm run build` in preference to `.env`. That split exists
+because the two files are easy to confuse and the failure is silent: a build
+that picks up the dev value ships a bundle telling every visitor's browser to
+call `http://localhost:5000`, which fails for everyone except the developer who
+built it. Leave the localhost values in `.env` and never put a production URL
+there.
 
 ---
 
@@ -366,17 +382,45 @@ Every CMS list also has `GET /:resource/all`, `POST`, `PUT /:id`,
 
 ## 9. Deployment
 
+### How the live site is wired
+
+Everything is served from one domain, `https://growfarm-fullstack.dvworks.in`:
+
+| Path | Served by |
+|---|---|
+| `/` | the website build (`dist/`) |
+| `/admin` | the panel build (`admin/dist/`) |
+| `/api/*` | proxied to the Node process |
+| `/api/uploads/*` | the same Node process, serving `backend/uploads/` |
+
+One domain is why both front ends build with a **relative** `VITE_API_URL=/api`:
+the same bundle is correct on any domain, and no browser request is ever
+cross-origin, so CORS cannot break the site.
+
+The one thing to know: **`/uploads` on its own is not routed to Node.** A bare
+`/uploads/x.jpg` reaches the static site, misses, and comes back as `200` with
+the SPA's `index.html` — so an `<img>` renders broken rather than 404ing. That
+is why image URLs are built under the API prefix instead. If you would rather
+serve them directly, add the proxy rule (nginx `location /uploads { proxy_pass
+http://127.0.0.1:5000; }`) — the `/uploads` mount is still there and both paths
+serve the same folder.
+
 ### Backend (VPS with nginx)
 
 ```bash
 git clone <repo> && cd backend
 npm ci --omit=dev
-cp .env.example .env        # set NODE_ENV=production, real DB creds,
-                            # a strong JWT_SECRET, PUBLIC_URL, CORS_ORIGINS
+cp .env.production.example .env   # then fill in the two CHANGE ME values
 npm run db:migrate
 npm run db:seed
 npm i -g pm2 && pm2 start src/server.js --name growfarms-api && pm2 save
 ```
+
+The live deployment puts the API on the site's own domain under `/api` (see the
+`location /api` block further down). The block below is the **alternative**
+layout — the API on a subdomain of its own — kept for reference. On that layout
+`PUBLIC_URL` becomes `https://api.growfarms.com` and `CORS_ORIGINS` has to list
+the website's domain, because requests then really are cross-origin.
 
 ```nginx
 server {
@@ -404,9 +448,10 @@ and upload `backend/uploads/` with write permission.
 
 ### Frontend and admin
 
-Both are static builds. Set `VITE_API_URL` in each `.env` **before** building —
-Vite bakes it into the bundle, so changing it later means rebuilding, not
-re-uploading a `.env`.
+Both are static builds, and Vite bakes the API URL **into the bundle** — changing
+it later means rebuilding, not re-uploading a `.env`. The production values are
+already committed in `.env.production` and `admin/.env.production`, which Vite
+loads for `npm run build` ahead of `.env`, so the correct build is just:
 
 ```bash
 # website  → dist/
@@ -415,6 +460,17 @@ npm run build
 # admin    → admin/dist/
 cd admin && npm run build
 ```
+
+Confirm before uploading — this catches the failure that is otherwise invisible
+until the site is live:
+
+```bash
+grep -o 'localhost:50*[0-9]*' dist/assets/*.js admin/dist/assets/*.js   # must print nothing
+```
+
+(Grepping for bare `localhost` gives a false positive — react-router carries one
+internally as a placeholder origin. The port is what tells you a dev API URL got
+baked in.)
 
 The admin panel ships **inside the public site at `/admin`**, not on a
 subdomain. Three things make that work, and all three are already in the repo:
@@ -457,7 +513,20 @@ location / {
 location /admin {
     try_files $uri $uri/ /admin/index.html;
 }
+
+# Must come before the fallbacks above, or /api requests are answered with
+# index.html and every fetch() parses HTML as JSON.
+location /api {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 10M;          # must exceed MAX_UPLOAD_SIZE_MB
+}
 ```
+
+The root `.htaccess` carries the same guard for Apache
+(`RewriteRule ^(api|uploads)(/|$) - [L]`).
 
 Because the panel is same-origin with the website, `CORS_ORIGINS` only needs
 the one domain (plus its `www` form).
@@ -468,7 +537,11 @@ the one domain (plus its `www` form).
 - [ ] Strong `JWT_SECRET` (48+ random bytes), never the example value
 - [ ] Dedicated MySQL user, not `root`
 - [ ] `CORS_ORIGINS` set to your real domains only
-- [ ] `PUBLIC_URL` set to the HTTPS API domain, or images will 404
+- [ ] `PUBLIC_URL` set to the HTTPS domain, origin only with no `/api` on the end
+- [ ] `dist/` and `admin/dist/` built with `.env.production` in place —
+      `grep -o 'localhost:5[0-9]*' dist/assets/*.js admin/dist/assets/*.js`
+      must print nothing
+- [ ] An image URL from `/api/projects/map` opens as an image, not as HTML
 - [ ] Seed admin password changed after first login
 - [ ] HTTPS on both domains (website + API)
 - [ ] `admin/dist/.htaccess` uploaded into `public_html/admin/` (hidden file — turn on "show hidden files" in your FTP client)

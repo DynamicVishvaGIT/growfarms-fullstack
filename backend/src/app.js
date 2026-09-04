@@ -15,6 +15,19 @@ const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
+/**
+ * Where uploaded images are served from.
+ *
+ * The prefixed mount is the one that matters in production: the site, the panel
+ * and the API share a domain there, and the host routes only `/api/*` to this
+ * process, so a bare `/uploads/...` never arrives -- the static site answers it
+ * with its SPA fallback and every image renders as broken HTML. Serving the
+ * folder under the prefix too means images ride the one route known to reach
+ * us. `/uploads` stays mounted for deployments that proxy a whole origin here,
+ * and so any URL written down before the prefix existed still resolves.
+ */
+const uploadsMounts = [`/${env.upload.dir}`, `${env.apiPrefix}/${env.upload.dir}`];
+
 // Behind nginx/Apache in production, so req.ip reflects the real client.
 if (env.isProduction) app.set("trust proxy", 1);
 
@@ -75,15 +88,17 @@ app.use(
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: "Too many requests. Please slow down." },
-    // Static uploads are cheap and hit hard by image-heavy pages.
-    skip: (req) => req.path.startsWith(`/${env.upload.dir}/`),
+    // Static uploads are cheap and hit hard by image-heavy pages. Both mounts
+    // have to be skipped, or one gallery page served through the prefixed mount
+    // would burn the whole window's budget on images.
+    skip: (req) => uploadsMounts.some((m) => req.path.startsWith(`${m}/`)),
   }),
 );
 
 /* ── Static uploads ──────────────────────────────────────────────────────── */
 
 app.use(
-  `/${env.upload.dir}`,
+  uploadsMounts,
   express.static(env.paths.uploads, {
     maxAge: env.isProduction ? "30d" : 0,
     etag: true,
