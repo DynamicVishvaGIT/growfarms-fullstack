@@ -1,0 +1,47 @@
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+
+    container_name: growfarms-backend
+
+    restart: unless-stopped
+
+    env_file:
+      - ./backend/.env
+
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+
+    ports:
+      - "5000:5000"
+
+    networks:
+      - two-tier
+
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+
+    container_name: growfarms-frontend
+
+    restart: unless-stopped
+
+    ports:
+      - "8082:80"
+
+    depends_on:
+      - backend
+
+    networks:
+      - two-tier
+
+
+networks:
+  two-tier:
+    external: true
