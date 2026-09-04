@@ -3,17 +3,26 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-
 RUN npm ci
 
 COPY . .
 
+# Main website build
+RUN npm run build
+
+# Admin panel build
+WORKDIR /app/admin
+RUN npm ci
 RUN npm run build
 
 
 FROM nginx:alpine
 
+# Main website
 COPY --from=build /app/dist /usr/share/nginx/html
+
+# Admin panel → /admin/
+COPY --from=build /app/admin/dist /usr/share/nginx/html/admin
 
 EXPOSE 80
 
