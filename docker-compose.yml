@@ -27,17 +27,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-
+      args:
+        VITE_API_URL: https://growfarm-fullstack.dvworks.in/api
+  
     container_name: growfarms-frontend
-
+  
     restart: unless-stopped
-
+  
     ports:
       - "8082:80"
-
+  
     depends_on:
       - backend
-
+  
     networks:
       - two-tier
 
