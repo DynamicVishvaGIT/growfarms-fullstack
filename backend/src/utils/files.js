@@ -25,7 +25,7 @@ function toPublicUrl(storedPath) {
 }
 
 /** Map over an object's image-ish fields, converting each to a public URL. */
-function withUrls(plain, fields = ["image", "image_path", "hero_image", "map_image", "featured_image", "icon_image", "avatar", "thumbnail", "logo"]) {
+function withUrls(plain, fields = ["image", "image_path", "hero_image", "map_image", "featured_image", "banner_image", "icon_image", "avatar", "thumbnail", "logo"]) {
   if (!plain || typeof plain !== "object") return plain;
   const out = { ...plain };
   for (const f of fields) {
