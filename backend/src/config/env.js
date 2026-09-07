@@ -36,6 +36,11 @@ const env = {
     user: required("DB_USER", "root"),
     password: process.env.DB_PASSWORD || "",
     logging: bool(process.env.DB_LOGGING, false),
+    // Create tables a model needs but the database lacks, at boot. Only ever
+    // CREATE TABLE — existing tables are never altered or dropped — so a
+    // newly deployed model stops meaning a hand-run migration. Off by default:
+    // a server should not issue DDL unless someone asked it to.
+    autoCreateTables: bool(process.env.DB_AUTO_CREATE, false),
   },
 
   jwt: {

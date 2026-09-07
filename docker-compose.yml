@@ -19,6 +19,17 @@ services:
     ports:
       - "5000:5000"
 
+    # Everything the admin panel uploads is written to /app/uploads at runtime.
+    # Without this volume that folder lives only in the container's writable
+    # layer, so every rebuild threw the uploaded files away while their rows
+    # stayed in the database — which is why those images 404'd while the
+    # seed images, baked into the image itself, kept working.
+    #
+    # A named volume (not a bind mount) on purpose: Docker seeds an empty one
+    # from the image's own /app/uploads, so uploads/seed survives the change.
+    volumes:
+      - growfarms-uploads:/app/uploads
+
     networks:
       - two-tier
 
@@ -47,3 +58,7 @@ services:
 networks:
   two-tier:
     external: true
+
+
+volumes:
+  growfarms-uploads:

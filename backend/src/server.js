@@ -15,6 +15,26 @@ async function start() {
     process.exit(1);
   }
 
+  // With DB_AUTO_CREATE=true a deploy that adds a model brings its table with
+  // it, instead of answering 500 until someone remembers to migrate by hand.
+  // Creating is all it does; a table that already exists is left untouched,
+  // and a boot must never be blocked by this, so a failure only warns.
+  if (env.db.autoCreateTables) {
+    try {
+      const { createMissingTables } = require("./scripts/syncTables");
+      const { created, incomplete } = await createMissingTables();
+
+      for (const c of created) console.log(`[boot] created missing table \`${c.table}\` (${c.name})`);
+      for (const t of incomplete) {
+        console.warn(
+          `[boot] \`${t.table}\` exists but is missing: ${t.missing.map((m) => m.column).join(", ")}`,
+        );
+      }
+    } catch (err) {
+      console.warn("[boot] table auto-create skipped:", err.message);
+    }
+  }
+
   const server = app.listen(env.port, () => {
     console.log("");
     console.log(`  Grow Farms API`);

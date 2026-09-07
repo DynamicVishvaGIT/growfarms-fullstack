@@ -10,6 +10,7 @@
     "dev": "nodemon src/server.js",
     "db:migrate": "node src/scripts/migrate.js",
     "db:seed": "node src/scripts/seed.js",
+    "db:sync": "node src/scripts/syncTables.js",
     "db:reset": "node src/scripts/migrate.js --force && node src/scripts/seed.js",
     "test:routes": "node smoke.test.cjs",
     "test:audit": "node audit.cjs"
