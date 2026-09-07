@@ -474,7 +474,7 @@ export default function Aboutsarasview() {
           color: rgba(255,255,255,0.75);
 
           font-size:
-            clamp(13px, 1.15vw, 15px);
+            clamp(1rem, 1.15vw, 15px);
 
           line-height: 1.85;
 

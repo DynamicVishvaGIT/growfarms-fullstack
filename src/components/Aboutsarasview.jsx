@@ -181,8 +181,8 @@ const AboutSarasview = () => {
         .asv-section {
           background: #315537;
           overflow  : hidden;
-          padding   : clamp(3.5rem, 8vw, 7rem) clamp(1.25rem, 5vw, 4rem)
-                      clamp(3rem, 7vw, 6rem);
+           padding   : clamp(2rem, 4vw, 3rem) clamp(1.25rem, 5vw, 4rem)
+       
         }
 
         .asv-inner {
@@ -217,12 +217,11 @@ const AboutSarasview = () => {
         }
 
         .asv-body {
-          font-family: "Montserrat", sans-serif;
-          font-size  : clamp(0.8rem, 1.05vw, 0.875rem);
+          clamp(1rem, 1.15vw, 15px);
           font-weight: 300;
-          line-height: 1.95;
+          line-height: 1.85;
           color      : rgba(230, 238, 220, 0.82);
-          max-width  : 46rem;
+          max-width: 990px;
           margin     : clamp(1.1rem, 2.4vw, 1.6rem) auto 0;
         }
 
@@ -256,7 +255,6 @@ const AboutSarasview = () => {
           border-radius: clamp(10px, 1.2vw, 16px);
           aspect-ratio : 5 / 6.4;
           background   : rgba(255, 255, 255, 0.06);
-          box-shadow   : 0 18px 40px rgba(0, 0, 0, 0.28);
           transition   : transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
                          box-shadow 0.65s cubic-bezier(0.22, 1, 0.36, 1);
         }

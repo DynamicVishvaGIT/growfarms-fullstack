@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { gsap } from "gsap";
-import { X, ArrowUpRight, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { X, ArrowUpRight } from "lucide-react";
 import { getLenis } from "../hooks/useSmoothScroll";
 import {
   validateName,
@@ -54,10 +55,11 @@ function Field({ as: Tag = "input", rowRef, error, name, ...props }) {
 }
 
 export default function EnquiryModal({ open, onClose, property }) {
+  const navigate = useNavigate();
+
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
 
@@ -65,7 +67,6 @@ export default function EnquiryModal({ open, onClose, property }) {
   const backdropRef = useRef(null);
   const cardRef = useRef(null);
   const rowsRef = useRef([]);
-  const successRef = useRef(null);
 
   // The overlay stays mounted so the exit animation can play out; `prevOpen`
   // tells us whether this run is an open, a close, or the initial idle state.
@@ -112,7 +113,6 @@ export default function EnquiryModal({ open, onClose, property }) {
               setForm(EMPTY_FORM);
               setErrors({});
               setTouched({});
-              setSent(false);
               setSendError("");
             },
           })
@@ -223,7 +223,17 @@ export default function EnquiryModal({ open, onClose, property }) {
         project_slug: property?.slug || property?.id || undefined,
         subject: property?.label || property?.title || undefined,
       });
-      setSent(true);
+      // The visitor is confirmed on the Thank You page rather than in place, so
+      // close this modal on the way out and let the route carry the news.
+      onClose();
+      navigate("/thank-you", {
+        replace: true,
+        state: {
+          source: "enquiry_modal",
+          name: form.name.trim(),
+          subject: property?.label || property?.title || undefined,
+        },
+      });
     } catch (err) {
       const fieldErrors = toFormErrors(err);
       if (Object.keys(fieldErrors).length) {
@@ -238,27 +248,6 @@ export default function EnquiryModal({ open, onClose, property }) {
       setSending(false);
     }
   };
-
-  // ── Success panel entrance ────────────────────────────────────────────────
-  useLayoutEffect(() => {
-    if (!sent) return;
-    const ctx = gsap.context(() => {
-      gsap
-        .timeline()
-        .fromTo(
-          successRef.current,
-          { opacity: 0, y: 20 },
-          { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" },
-        )
-        .fromTo(
-          "[data-tick]",
-          { scale: 0 },
-          { scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "-=0.3",
-        );
-    }, successRef);
-    return () => ctx.revert();
-  }, [sent]);
 
   const title = property?.label ?? "";
 
@@ -305,118 +294,90 @@ export default function EnquiryModal({ open, onClose, property }) {
           />
         </button>
 
-        {sent ? (
-          <div ref={successRef} className="flex flex-col items-center py-10 text-center">
-            <div
-              data-tick
-              className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#315537]"
-            >
-              <Check className="h-8 w-8 text-white" strokeWidth={3} />
-            </div>
-            <h3 className="text-2xl text-[#1a3d22]" style={{ fontWeight: 600 }}>
-              Thank you!
-            </h3>
-            <p className="sub_font mt-2 max-w-[320px] text-sm leading-relaxed text-[#3d5040]">
-              Your enquiry about {title} has been received. Our team will reach out to
-              you shortly.
+        <div ref={(el) => (rowsRef.current[0] = el)}>
+          <span className="inline-block rounded-full bg-[#e4ede6] px-4 py-1.5 text-xs font-medium tracking-wide text-[#16281c]">
+            Enquire Now
+          </span>
+          <h3
+            className="mt-4 text-[#1a3d22]"
+            style={{ fontSize: "clamp(1.4rem, 3vw, 1.85rem)", fontWeight: 600 }}
+          >
+            Interested in {title}?
+          </h3>
+          <p className="sub_font mt-2 text-sm leading-relaxed text-[#3d5040]">
+            Share your details and our team will get back to you with plot
+            availability and pricing.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4" noValidate>
+          <Field
+            rowRef={(el) => (rowsRef.current[1] = el)}
+            type="text"
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            error={errors.name}
+            placeholder="Full Name"
+            autoComplete="name"
+            maxLength={60}
+          />
+          <Field
+            rowRef={(el) => (rowsRef.current[2] = el)}
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            error={errors.email}
+            placeholder="Email Address"
+            autoComplete="email"
+            maxLength={254}
+          />
+          <Field
+            rowRef={(el) => (rowsRef.current[3] = el)}
+            type="tel"
+            name="phone"
+            value={form.phone}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            error={errors.phone}
+            placeholder="Phone Number"
+            autoComplete="tel"
+            maxLength={20}
+          />
+          <Field
+            as="textarea"
+            rowRef={(el) => (rowsRef.current[4] = el)}
+            name="message"
+            value={form.message}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            error={errors.message}
+            placeholder="Message (optional)"
+            rows={4}
+            maxLength={1000}
+          />
+
+          {sendError && (
+            <p className="text-xs text-red-600" role="alert">
+              {sendError}
             </p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-7 cursor-pointer rounded-full bg-[#315537] px-8 py-3 text-sm
-                font-medium text-white transition-colors hover:bg-[#16281c]"
-            >
-              Close
-            </button>
-          </div>
-        ) : (
-          <>
-            <div ref={(el) => (rowsRef.current[0] = el)}>
-              <span className="inline-block rounded-full bg-[#e4ede6] px-4 py-1.5 text-xs font-medium tracking-wide text-[#16281c]">
-                Enquire Now
-              </span>
-              <h3
-                className="mt-4 text-[#1a3d22]"
-                style={{ fontSize: "clamp(1.4rem, 3vw, 1.85rem)", fontWeight: 600 }}
-              >
-                Interested in {title}?
-              </h3>
-              <p className="sub_font mt-2 text-sm leading-relaxed text-[#3d5040]">
-                Share your details and our team will get back to you with plot
-                availability and pricing.
-              </p>
-            </div>
+          )}
 
-            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4" noValidate>
-              <Field
-                rowRef={(el) => (rowsRef.current[1] = el)}
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                error={errors.name}
-                placeholder="Full Name"
-                autoComplete="name"
-                maxLength={60}
-              />
-              <Field
-                rowRef={(el) => (rowsRef.current[2] = el)}
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                error={errors.email}
-                placeholder="Email Address"
-                autoComplete="email"
-                maxLength={254}
-              />
-              <Field
-                rowRef={(el) => (rowsRef.current[3] = el)}
-                type="tel"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                error={errors.phone}
-                placeholder="Phone Number"
-                autoComplete="tel"
-                maxLength={20}
-              />
-              <Field
-                as="textarea"
-                rowRef={(el) => (rowsRef.current[4] = el)}
-                name="message"
-                value={form.message}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                error={errors.message}
-                placeholder="Message (optional)"
-                rows={4}
-                maxLength={1000}
-              />
-
-              {sendError && (
-                <p className="text-xs text-red-600" role="alert">
-                  {sendError}
-                </p>
-              )}
-
-              <button
-                ref={(el) => (rowsRef.current[5] = el)}
-                type="submit"
-                disabled={sending}
-                className="mt-1 flex w-fit cursor-pointer items-center gap-2 rounded-full bg-[#315537]
-                  py-3.5 pr-7 pl-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]
-                  disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {sending ? "Sending…" : "Send Enquiry"}
-                <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
-              </button>
-            </form>
-          </>
-        )}
+          <button
+            ref={(el) => (rowsRef.current[5] = el)}
+            type="submit"
+            disabled={sending}
+            className="mt-1 flex w-fit cursor-pointer items-center gap-2 rounded-full bg-[#315537]
+              py-3.5 pr-7 pl-7 text-sm font-medium text-white shadow-md transition-colors hover:bg-[#16281c]
+              disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {sending ? "Sending…" : "Send Enquiry"}
+            <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </form>
       </div>
     </div>
   );

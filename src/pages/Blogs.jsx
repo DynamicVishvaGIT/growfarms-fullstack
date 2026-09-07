@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import BlogBanner from "../assets/images/Blog_Banner_2.jpeg";
@@ -19,6 +19,12 @@ import { getBlogs } from "../lib/api";
 
 gsap.registerPlugin(ScrollTrigger);
 
+const PAGE_SIZE = 12;
+
+// The API refuses to return more than 100 rows in one page, so this is what
+// "all of them" actually means here.
+const MAX_LIMIT = 100;
+
 const FALLBACK_POSTS = [
   { id: 1, img: img1, title: "Better Agriculture for Better Future" },
   { id: 2, img: img2, title: "A farmer is a person who works in agriculture." },
@@ -30,6 +36,9 @@ const FALLBACK_POSTS = [
   { id: 8, img: img8, title: "A farmer is a person who works in agriculture." },
   { id: 9, img: img9, title: "A farmer is a person who works in agriculture." },
 ];
+
+// The built-in list is all there is to show, so it never offers "View All".
+const FALLBACK_FEED = { items: FALLBACK_POSTS, hasMore: false };
 
 // ── icons ────────────────────────────────────────────────────────────────────
 const CalendarIcon = () => (
@@ -171,22 +180,32 @@ const Blogs = () => {
   const gridRef    = useRef(null);
   const viewAllRef = useRef(null);
 
-  const { data: posts } = useApiData(
+  // Raised by "View All", which is the only thing that refetches this list.
+  const [limit, setLimit] = useState(PAGE_SIZE);
+
+  const { data: feed } = useApiData(
     async (signal) => {
-      const rows = await getBlogs({ limit: 12 }, signal);
+      const rows = await getBlogs({ limit }, signal);
       if (!rows?.length) return null;
-      return rows.map((b) => ({
-        id: b.id,
-        slug: b.slug,
-        img: b.featured_image_url || FALLBACK_POSTS[0].img,
-        title: b.title,
-        category: b.category?.name,
-        date: formatCardDate(b.published_at || b.created_at),
-        author: (b.author_name || "Admin").toUpperCase(),
-      }));
+      return {
+        // A full page back means there is probably another page behind it.
+        hasMore: rows.length >= limit && limit < MAX_LIMIT,
+        items: rows.map((b) => ({
+          id: b.id,
+          slug: b.slug,
+          img: b.featured_image_url || FALLBACK_POSTS[0].img,
+          title: b.title,
+          category: b.category?.name,
+          date: formatCardDate(b.published_at || b.created_at),
+          author: (b.author_name || "Admin").toUpperCase(),
+        })),
+      };
     },
-    FALLBACK_POSTS,
+    FALLBACK_FEED,
+    [limit],
   );
+
+  const posts = feed.items;
 
   // Hero entrance
   useEffect(() => {
@@ -194,51 +213,91 @@ const Blogs = () => {
     return () => clearTimeout(t);
   }, []);
 
-  // Cards: staggered fade-up on scroll enter
-  useEffect(() => {
-    const cards = gridRef.current?.querySelectorAll(".blog-card");
-    if (!cards?.length) return;
+  // Cards: staggered fade-up on scroll enter.
+  //
+  // This has to re-run whenever `posts` changes. The built-in list renders
+  // first and the CMS list replaces it a moment later, so every card the API
+  // brings in is a DOM node this animation has never seen. Running only on
+  // mount meant those nodes kept the `opacity: 0` they were rendered with and
+  // stayed invisible — which is why posts "sometimes" did not show: the ones
+  // whose id happened to match the built-in list survived, because React
+  // reused those nodes, and the rest silently vanished.
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
 
-    gsap.fromTo(
-      cards,
-      { opacity: 0, y: 60 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.7,
-        ease: "power3.out",
-        stagger: { amount: 0.6, from: "start" },
-        scrollTrigger: {
-          trigger: gridRef.current,
-          start: "top 85%",
-          once: true,
-        },
-      }
-    );
+    // Cards already revealed keep what they have: re-animating the whole grid
+    // when "View All" appends to it would flash everything already on screen.
+    const cards = Array.from(grid.querySelectorAll(".blog-card:not([data-revealed])"));
+    if (!cards.length) return;
+    cards.forEach((el) => el.setAttribute("data-revealed", ""));
 
-    return () => ScrollTrigger.getAll().forEach((t) => t.kill());
-  }, []);
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 60 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.7,
+          ease: "power3.out",
+          stagger: { amount: 0.6, from: "start" },
+          scrollTrigger: {
+            trigger: grid,
+            start: "top 85%",
+            once: true,
+          },
+        }
+      );
+    }, gridRef);
 
-  // View All: fade-up on scroll enter
-  useEffect(() => {
-    if (!viewAllRef.current) return;
+    // Fail open. If the trigger never fires — a stale measurement, a refresh
+    // landing at the wrong moment — show the cards anyway rather than leave
+    // the page looking like there are no posts at all.
+    const safety = setTimeout(() => {
+      cards.forEach((el) => {
+        if (parseFloat(window.getComputedStyle(el).opacity) < 1) {
+          gsap.set(el, { opacity: 1, y: 0 });
+        }
+      });
+    }, 2500);
 
-    gsap.fromTo(
-      viewAllRef.current,
-      { opacity: 0, y: 30 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.6,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: viewAllRef.current,
-          start: "top 92%",
-          once: true,
-        },
-      }
-    );
-  }, []);
+    return () => {
+      clearTimeout(safety);
+      // `revert` puts the cards back to the visible state they render in, and
+      // touches only this grid — the old cleanup called
+      // `ScrollTrigger.getAll().kill()`, which killed the triggers belonging
+      // to every other section on the page as well.
+      ctx.revert();
+    };
+  }, [posts]);
+
+  // View All: fade-up on scroll enter. Keyed to `hasMore` because the button
+  // only exists while there is another page to ask for.
+  useLayoutEffect(() => {
+    const button = viewAllRef.current;
+    if (!button) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        button,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: button,
+            start: "top 92%",
+            once: true,
+          },
+        }
+      );
+    }, viewAllRef);
+
+    return () => ctx.revert();
+  }, [feed.hasMore]);
 
   // View All hover: letter-spacing expand
   const handleViewAllEnter = () => {
@@ -316,7 +375,7 @@ const Blogs = () => {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-10 max-w-6xl mx-auto"
         >
           {posts.map((post) => (
-            <div key={post.id} className="blog-card" style={{ opacity: 0 }}>
+            <div key={post.id} className="blog-card">
               <BlogCard
                 img={post.img}
                 title={post.title}
@@ -329,17 +388,19 @@ const Blogs = () => {
           ))}
         </div>
 
-        <div className="mt-12 flex justify-center">
-          <button
-            ref={viewAllRef}
-            onMouseEnter={handleViewAllEnter}
-            onMouseLeave={handleViewAllLeave}
-            className="text-white text-base font-normal underline underline-offset-4 decoration-white/60 hover:decoration-white transition-[text-decoration-color] duration-300"
-            style={{ opacity: 0 }}
-          >
-            View All
-          </button>
-        </div>
+        {feed.hasMore && (
+          <div className="mt-12 flex justify-center">
+            <button
+              ref={viewAllRef}
+              onClick={() => setLimit(MAX_LIMIT)}
+              onMouseEnter={handleViewAllEnter}
+              onMouseLeave={handleViewAllLeave}
+              className="text-white text-base font-normal underline underline-offset-4 decoration-white/60 hover:decoration-white transition-[text-decoration-color] duration-300 cursor-pointer"
+            >
+              View All
+            </button>
+          </div>
+        )}
       </section>
     </>
   );

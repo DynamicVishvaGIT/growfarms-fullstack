@@ -331,6 +331,18 @@ const BlogDetails = () => {
     };
   }, []);
 
+  // The article renders its built-in copy first and the CMS post replaces it a
+  // moment later, which changes the height of every section below it. The
+  // triggers above measured the old layout, so without this they fire at the
+  // wrong scroll positions — or, for anything whose start point the page has
+  // already scrolled past, never fire at all and leave the section hidden
+  // until the 2.5s safety net catches it.
+  useEffect(() => {
+    if (!post) return;
+    const t = setTimeout(() => ScrollTrigger.refresh(), 120);
+    return () => clearTimeout(t);
+  }, [post]);
+
   return (
     <div ref={pageRef}>
       {/* ---------------- HERO (unchanged) ---------------- */}

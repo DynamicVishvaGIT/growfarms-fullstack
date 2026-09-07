@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ContactBanner from "../assets/images/Contact_banner.png";
 import logo_img from "../assets/images/grow-farms-logo.png";
 import CardVector from "../assets/images/Vector__4_.png";
 import contectSideimg from "../assets/images/Contact.jpg";
 
-import { Mail, Phone, MapPin, ArrowUpRight, Check } from "lucide-react";
+import { Mail, Phone, MapPin, ArrowUpRight } from "lucide-react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
@@ -179,10 +180,11 @@ const Contact = () => {
   cardRefs.current = [];
   const addCardRef = (el) => el && cardRefs.current.push(el);
 
+  const navigate = useNavigate();
+
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
 
@@ -331,7 +333,6 @@ const Contact = () => {
     const { name, value } = e.target;
     const next = { ...form, [name]: value };
     setForm(next);
-    if (sent) setSent(false);
     if (sendError) setSendError("");
 
     // Only re-validate live once the field has been visited, so the user is
@@ -388,9 +389,12 @@ const Contact = () => {
         message: form.message.trim(),
       });
 
-      setSent(true);
-      setForm(EMPTY_FORM);
-      setTouched({});
+      // Confirmation lives on the Thank You page. `replace` keeps the filled-in
+      // form out of the back stack, so Back cannot walk into a second submit.
+      navigate("/thank-you", {
+        replace: true,
+        state: { source: "contact_page", name: form.firstName.trim() },
+      });
     } catch (err) {
       // The API keys its errors by snake_case field names; map them back onto
       // the camelCase names this form uses.
@@ -636,15 +640,6 @@ const Contact = () => {
                   </p>
                 )}
 
-                {sent && (
-                  <p
-                    role="status"
-                    className="flex items-center gap-2 text-sm font-medium text-[#315537]"
-                  >
-                    <Check className="h-4 w-4" strokeWidth={3} />
-                    Thanks! Your message has been sent — we will be in touch shortly.
-                  </p>
-                )}
               </form>
             </div>
           </div>

@@ -38,23 +38,6 @@ const FALLBACK_FACILITIES = [
   { img: Highway, label: "Highway" },
 ];
 
-const FALLBACK_ROUTES = [
-  {
-    icon: RoadIcon,
-    label: "By Road",
-    body: "Pali is approximately 112 kilometers away from Mumbai. You can drive by car or hire a taxi. State transport buses and private buses also operate between Mumbai and Pali.",
-  },
-  {
-    icon: TrainIcon,
-    label: "By Train",
-    body: "Pali is approximately 112 kilometers away from Mumbai. You can drive by car or hire a taxi. State transport buses and private buses also operate between Mumbai and Pali.",
-  },
-  {
-    icon: AirIcon,
-    label: "By Air",
-    body: "Pali is approximately 112 kilometers away from Mumbai. You can drive by car or hire a taxi. State transport buses and private buses also operate between Mumbai and Pali.",
-  },
-];
 
 /* ---------------------------------------------------------------------
    useReveal

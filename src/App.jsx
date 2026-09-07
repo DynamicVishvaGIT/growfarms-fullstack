@@ -14,6 +14,7 @@ import About from "./pages/About";
 import Blogs from "./pages/Blogs";
 import Testimonials from "./pages/Testimonials";
 import Contact from "./pages/Contact";
+import ThankYou from "./pages/ThankYou";
 import Details from "./pages/Details";
 
 import FooterSection from "./components/FooterSection";
@@ -60,6 +61,9 @@ const App = () => {
           <Route path="/testimonials" element={<Testimonials />} />
 
           <Route path="/contact" element={<Contact />} />
+
+          {/* Where both public forms land once an enquiry has been accepted. */}
+          <Route path="/thank-you" element={<ThankYou />} />
 
           <Route path="/details" element={<Details />} />
 

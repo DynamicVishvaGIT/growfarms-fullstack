@@ -32,6 +32,12 @@ function ringGeometry(count) {
   };
 }
 
+/** How far an angle sits from facing the camera, in degrees (0…180). */
+function offsetFromFront(deg) {
+  const wrapped = ((deg % 360) + 360) % 360;
+  return wrapped > 180 ? 360 - wrapped : wrapped;
+}
+
 function getScreenType() {
   if (typeof window === "undefined") return "desktop";
   if (window.innerWidth < 640) return "mobile";
@@ -45,8 +51,8 @@ export default function Carousel3D() {
   const [screenType, setScreenType] = useState(getScreenType);
   const [centerIndex, setCenterIndex] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
-  const cardRefs = useRef([]);
   const sceneRef = useRef(null);
+  const ringRef = useRef(null);
 
   const project = useProject();
 
@@ -66,6 +72,23 @@ export default function Carousel3D() {
 
   const { n: N, zDesktop, zMobile } = ringGeometry(videos.length);
 
+  // The list swaps under us: the built-in reel renders first and the CMS
+  // response lands a moment later. Everything below is keyed to a position in
+  // that list, so carrying it over means playing whatever video now happens to
+  // sit at the old index — and, when the new list is the shorter of the two,
+  // leaving `paused` set with no card playing at all, which strands the ring
+  // stopped with nothing on screen explaining why.
+  //
+  // Resetting while rendering — React's documented alternative to an effect for
+  // exactly this — keeps the stale index from ever reaching the DOM.
+  const [renderedVideos, setRenderedVideos] = useState(videos);
+  if (renderedVideos !== videos) {
+    setRenderedVideos(videos);
+    setPlayingIndex(null);
+    setCenterIndex(null);
+    setPaused(false);
+  }
+
   useEffect(() => {
     const onResize = () => setScreenType(getScreenType());
     window.addEventListener("resize", onResize);
@@ -73,12 +96,9 @@ export default function Carousel3D() {
   }, []);
 
   // Only run the centered-card detection (and the ring rotation, see CSS
-  // below) while the carousel is actually on screen. Previously this loop
-  // ran unconditionally forever, forcing 6 layout reads every ~100ms even
-  // while scrolled far away — that constant main-thread work compounded
-  // with the CSS 3D rotation's paint cost and was measurably dropping
-  // frame rate (and, on slower machines, making scroll feel like it had
-  // stalled) specifically while this section was in view.
+  // below) while the carousel is actually on screen — the polling loop and
+  // the CSS 3D rotation together were measurably dropping frame rate even
+  // with the section scrolled far out of view.
   useEffect(() => {
     const node = sceneRef.current;
     if (!node) return;
@@ -90,8 +110,41 @@ export default function Carousel3D() {
     return () => observer.disconnect();
   }, []);
 
+  // Which card is the one facing the viewer.
+  //
+  // The ring is built with a negative radius, so a card is square-on to the
+  // camera at the *far* centre of the ring — where its total rotation comes
+  // back round to a multiple of 360°. Picking the widest card box instead, as
+  // this used to, always chose the card at 180°: the one nearest the camera,
+  // and so the one `backface-visibility: hidden` is busy hiding. The highlight
+  // only ever landed on a card nobody could see.
   useEffect(() => {
-    if (!isVisible) return;
+    const ring = ringRef.current;
+    if (!ring || !isVisible) return;
+
+    const readCenter = () => {
+      const transform = getComputedStyle(ring).transform;
+      // rotateY(θ) leaves cos θ in m11 and sin θ in m31.
+      const matrix =
+        transform && transform !== "none" ? new DOMMatrixReadOnly(transform) : null;
+      const ringDeg = matrix ? (Math.atan2(matrix.m31, matrix.m11) * 180) / Math.PI : 0;
+
+      let best = null;
+      let bestOffset = Infinity;
+      for (let i = 0; i < videos.length; i += 1) {
+        const offset = offsetFromFront(ringDeg + (360 / N) * i);
+        if (offset < bestOffset) {
+          bestOffset = offset;
+          best = i;
+        }
+      }
+
+      if (best !== null) setCenterIndex((prev) => (prev !== best ? best : prev));
+    };
+
+    readCenter();
+    // A stopped ring stays on whatever card it stopped at.
+    if (paused) return;
 
     let rafId;
     let lastCheck = 0;
@@ -99,28 +152,14 @@ export default function Carousel3D() {
     const loop = (time) => {
       if (time - lastCheck > 300) {
         lastCheck = time;
-        let maxWidth = -Infinity;
-        let maxIdx = null;
-
-        cardRefs.current.forEach((el, i) => {
-          if (!el) return;
-          const w = el.getBoundingClientRect().width;
-          if (w > maxWidth) {
-            maxWidth = w;
-            maxIdx = i;
-          }
-        });
-
-        if (maxIdx !== null) {
-          setCenterIndex((prev) => (prev !== maxIdx ? maxIdx : prev));
-        }
+        readCenter();
       }
       rafId = requestAnimationFrame(loop);
     };
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [isVisible]);
+  }, [isVisible, paused, videos, N]);
 
   const mobile = screenType === "mobile";
   const laptop = screenType === "laptop";
@@ -286,7 +325,7 @@ export default function Carousel3D() {
           title={paused ? "Click to resume" : "Click to pause"}
         />
 
-        <div className="c3d-a3d">
+        <div className="c3d-a3d" ref={ringRef}>
           {videos.map((videoId, i) => {
             const angleDeg = (360 / N) * i;
             const isPlaying = playingIndex === i;
@@ -294,8 +333,7 @@ export default function Carousel3D() {
 
             return (
               <div
-                key={videoId}
-                ref={(el) => (cardRefs.current[i] = el)}
+                key={`${videoId}-${i}`}
                 className={`c3d-card${isPlaying ? " active" : ""}${
                   !isPlaying && isCentered ? " centered" : ""
                 }`}
