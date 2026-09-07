@@ -42,8 +42,12 @@ const FooterSection = () => {
       navigation: extra.navigation?.length ? extra.navigation : FALLBACK_FOOTER.navigation,
       projects: extra.projects?.length ? extra.projects : FALLBACK_FOOTER.projects,
       address: settings?.contact_address || block?.body || FALLBACK_FOOTER.address,
-      email: settings?.contact_email || FALLBACK_FOOTER.email,
-      phone: settings?.contact_phone || FALLBACK_FOOTER.phone,
+      // The primary pair from Settings → Contact details, which is the same
+      // pair the contact page leads with. There is no `contact_email` /
+      // `contact_phone` key — reading those was why the footer ignored the
+      // admin panel and always showed the fallbacks below.
+      email: settings?.contact_email_1 || FALLBACK_FOOTER.email,
+      phone: settings?.contact_phone_1 || FALLBACK_FOOTER.phone,
       copyright: settings?.copyright_text || extra.copyright || FALLBACK_FOOTER.copyright,
       logo: settings?.site_logo || null,
     };

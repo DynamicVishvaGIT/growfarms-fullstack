@@ -14,6 +14,26 @@ const GROUPS = [
   { key: "media", label: "Logo & media" },
 ];
 
+/**
+ * Where the website actually reads each value.
+ *
+ * The key on its own does not say which part of the site a box controls, and
+ * several of them feed more than one page — the footer and the contact page
+ * share the primary email and phone, so editing one changes both. Keys absent
+ * from this map just show their key, as before.
+ */
+const USED_BY = {
+  contact_email_1: "Footer, and the first entry on the contact page",
+  contact_email_2: "Contact page only",
+  contact_phone_1: "Footer, and the first entry on the contact page",
+  contact_phone_2: "Contact page only",
+  contact_address: "Footer, and the contact page",
+  copyright_text: "Footer",
+  site_logo: "Footer",
+};
+
+const usageHint = (key) => (USED_BY[key] ? `${key} — ${USED_BY[key]}` : key);
+
 export default function Settings() {
   const toast = useToast();
 
@@ -138,7 +158,7 @@ export default function Settings() {
                       setImageFiles((m) => ({ ...m, [s.key]: null }));
                       setRemovedImages((m) => ({ ...m, [s.key]: true }));
                     }}
-                    hint={s.key}
+                    hint={usageHint(s.key)}
                   />
                 );
               }
@@ -153,7 +173,7 @@ export default function Settings() {
                   rows={s.type === "textarea" ? 3 : undefined}
                   value={values[s.key] ?? ""}
                   onChange={(e) => setValues((v) => ({ ...v, [s.key]: e.target.value }))}
-                  hint={s.key}
+                  hint={usageHint(s.key)}
                 />
               );
             })
