@@ -19,6 +19,9 @@ services:
     ports:
       - "5000:5000"
 
+    volumes:
+      - growfarms-uploads:/app/uploads
+
     networks:
       - two-tier
 
@@ -47,3 +50,7 @@ services:
 networks:
   two-tier:
     external: true
+
+
+volumes:
+  growfarms-uploads:
