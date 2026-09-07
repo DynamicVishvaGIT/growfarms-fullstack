@@ -67,6 +67,16 @@ CREATE TABLE IF NOT EXISTS `projects` (
   `category_id` INTEGER UNSIGNED,
   `hero_image` VARCHAR(255),
   `map_image` VARCHAR(255),
+  `about_eyebrow` VARCHAR(80),
+  `about_title` VARCHAR(200),
+  `about_body` TEXT,
+  `about_image` VARCHAR(255),
+  `about_image_2` VARCHAR(255),
+  `about_image_3` VARCHAR(255),
+  `about_image_4` VARCHAR(255),
+  `invest_title` VARCHAR(200),
+  `invest_body` TEXT,
+  `invest_image` VARCHAR(255),
   `map_pin_top` DECIMAL(5,2),
   `map_pin_left` DECIMAL(5,2),
   `status` ENUM('active', 'inactive', 'sold_out') NOT NULL DEFAULT 'active',
@@ -247,6 +257,7 @@ CREATE INDEX `travel_routes_project_id` ON `travel_routes` (`project_id`);
 CREATE TABLE IF NOT EXISTS `buying_steps` (
   `id` INTEGER UNSIGNED auto_increment ,
   `scope` ENUM('details', 'blog') NOT NULL DEFAULT 'details',
+  `project_id` INTEGER UNSIGNED,
   `step_number` VARCHAR(6) NOT NULL,
   `title` VARCHAR(160) NOT NULL,
   `description` TEXT,
@@ -259,10 +270,12 @@ CREATE TABLE IF NOT EXISTS `buying_steps` (
   `is_active` TINYINT(1) NOT NULL DEFAULT true,
   `created_at` DATETIME NOT NULL,
   `updated_at` DATETIME NOT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE INDEX `buying_steps_scope` ON `buying_steps` (`scope`);
+CREATE INDEX `buying_steps_project_id` ON `buying_steps` (`project_id`);
 
 -- ─────────────────────────────────────────────────────────────────────
 --  why_pali_slides
@@ -339,12 +352,31 @@ CREATE INDEX `faqs_project_id` ON `faqs` (`project_id`);
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `testimonials` (
   `id` INTEGER UNSIGNED auto_increment ,
+  `project_id` INTEGER UNSIGNED,
   `youtube_id` VARCHAR(40),
   `author_name` VARCHAR(120),
   `author_role` VARCHAR(120),
   `quote` TEXT,
   `thumbnail` VARCHAR(255),
   `rating` TINYINT UNSIGNED,
+  `sort_order` INTEGER NOT NULL DEFAULT 0,
+  `is_active` TINYINT(1) NOT NULL DEFAULT true,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE INDEX `testimonials_project_id` ON `testimonials` (`project_id`);
+
+-- ─────────────────────────────────────────────────────────────────────
+--  social_links
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `social_links` (
+  `id` INTEGER UNSIGNED auto_increment ,
+  `name` VARCHAR(80) NOT NULL,
+  `platform` ENUM('facebook', 'instagram', 'youtube', 'twitter', 'linkedin', 'whatsapp', 'other') NOT NULL DEFAULT 'other',
+  `url` VARCHAR(400) NOT NULL,
   `sort_order` INTEGER NOT NULL DEFAULT 0,
   `is_active` TINYINT(1) NOT NULL DEFAULT true,
   `created_at` DATETIME NOT NULL,

@@ -1,10 +1,10 @@
 "use strict";
 
 /**
- * The nine simple CMS lists.
+ * The ten simple CMS lists.
  *
  * Each is the same shape — a flat, sortable, toggleable row with at most one
- * image — so they share `crudFactory` rather than nine near-identical files.
+ * image — so they share `crudFactory` rather than ten near-identical files.
  * Every field list here is a whitelist: nothing outside it can be written.
  */
 
@@ -19,6 +19,7 @@ const {
   PhilosophyCard,
   Faq,
   Testimonial,
+  SocialLink,
 } = require("../models");
 
 const amenities = crudFactory({
@@ -124,6 +125,12 @@ const testimonials = crudFactory({
   imageFolder: "misc",
 });
 
+const socialLinks = crudFactory({
+  model: SocialLink,
+  label: "Social link",
+  fields: ["name", "platform", "url", "sort_order", "is_active"],
+});
+
 module.exports = {
   amenities,
   facilities,
@@ -134,4 +141,5 @@ module.exports = {
   philosophyCards,
   faqs,
   testimonials,
+  socialLinks,
 };

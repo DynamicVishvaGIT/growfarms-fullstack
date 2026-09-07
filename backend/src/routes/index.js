@@ -361,5 +361,6 @@ mountCms("why-choose-cards", cms.whyChooseCards, miscUpload);
 mountCms("philosophy-cards", cms.philosophyCards, null);
 mountCms("faqs", cms.faqs, null);
 mountCms("testimonials", cms.testimonials, miscUpload);
+mountCms("social-links", cms.socialLinks, null);
 
 module.exports = router;

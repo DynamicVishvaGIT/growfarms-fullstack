@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Save } from "lucide-react";
 
 import { settings } from "../api/endpoints";
@@ -106,6 +107,15 @@ export default function Settings() {
           </button>
         ))}
       </div>
+
+      {group === "social" && (
+        <Alert tone="info">
+          The footer's social icons are managed on{" "}
+          <Link to="/cms/social-links">Social Media Links</Link>, where each platform
+          has its own row, icon and on/off switch. Any social keys still listed below
+          are left over from an earlier setup and are not read by the website.
+        </Alert>
+      )}
 
       <div className="card">
         <div className="card-body">

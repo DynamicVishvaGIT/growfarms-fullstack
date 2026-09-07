@@ -18,7 +18,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- ── admins ──
 INSERT INTO `admins` (`id`, `name`, `email`, `password_hash`, `role`, `is_active`, `created_at`, `updated_at`) VALUES
-  (1, 'Grow Farms Admin', 'admin@growfarms.com', '$2a$12$1wP7E9Ynt6ZWAfqzvx4qleae70A59RnM08O8ph4TcHW0hZ4wel7Ym', 'super_admin', 1, '2026-09-02 12:00:00', '2026-09-02 12:00:00');
+  (1, 'Grow Farms Admin', 'admin@growfarms.com', '$2a$12$3m.Lz.ksrFiS6RS6YwwRxOPYhurL5BE.YRh5cFzl2BrMCrBeJsEx.', 'super_admin', 1, '2026-09-02 12:00:00', '2026-09-02 12:00:00');
 
 -- ── categories ──
 INSERT INTO `categories` (`id`, `is_active`, `name`, `slug`, `type`, `sort_order`, `created_at`, `updated_at`) VALUES
@@ -177,6 +177,15 @@ INSERT INTO `testimonials` (`id`, `is_active`, `youtube_id`, `sort_order`, `crea
   (5, 1, 'd8ul6Akvu7o', 5, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
   (6, 1, 'TJfRcYy5y1M', 6, '2026-09-02 12:00:00', '2026-09-02 12:00:00');
 
+-- ── social_links ──
+INSERT INTO `social_links` (`id`, `name`, `platform`, `url`, `sort_order`, `is_active`, `created_at`, `updated_at`) VALUES
+  (1, 'Facebook', 'facebook', 'https://www.facebook.com/', 1, 0, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
+  (2, 'Instagram', 'instagram', 'https://www.instagram.com/', 2, 0, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
+  (3, 'YouTube', 'youtube', 'https://www.youtube.com/', 3, 0, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
+  (4, 'X (Twitter)', 'twitter', 'https://x.com/', 4, 0, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
+  (5, 'LinkedIn', 'linkedin', 'https://www.linkedin.com/', 5, 0, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
+  (6, 'WhatsApp', 'whatsapp', 'https://wa.me/', 6, 0, '2026-09-02 12:00:00', '2026-09-02 12:00:00');
+
 -- ── blogs ──
 INSERT INTO `blogs` (`id`, `slug`, `category_id`, `views`, `title`, `excerpt`, `content`, `featured_image`, `banner_image`, `author_name`, `published_at`, `status`, `is_featured`, `sort_order`, `created_at`, `updated_at`) VALUES
   (1, 'better-agriculture-for-better-future', 5, 0, 'Better Agriculture for Better Future', 'Explore how modern farmland ownership near Pali combines a peaceful lifestyle with long-term, transparent investment value.', '<p>Grow Farms brings you verified, plotted agricultural land near Pali, Maharashtra. Every plot is documented, fenced and serviced with water, electricity and road access.</p><p>Our team walks you through site selection, a guided visit, full legal verification and registration — so owning farmland is as straightforward as it should be.</p>', 'uploads/seed/Blog_Banner_2.jpeg', 'uploads/seed/blog_details.png', 'Admin', '2024-03-28 10:00:00', 'published', 1, 1, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
@@ -228,14 +237,9 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `label`, `setting_
   (8, 'contact_phone_2', '(+01) 654 - 545 - 1235', 'Mobile', 'contact', 'text', 4, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
   (9, 'contact_address', 'Grow Farms 305, The Landmark, Next to Hotel Three Star, Sector 7, Kharghar, Navi Mumbai, Maharashtra 410210', 'Office address', 'contact', 'textarea', 5, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
   (10, 'google_map_embed', 'https://www.google.com/maps?q=Mumbai,Maharashtra,India&output=embed', 'Google Maps embed URL', 'contact', 'url', 6, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (11, 'social_facebook', '', 'Facebook', 'social', 'url', 1, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (12, 'social_instagram', '', 'Instagram', 'social', 'url', 2, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (13, 'social_youtube', '', 'YouTube', 'social', 'url', 3, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (14, 'social_linkedin', '', 'LinkedIn', 'social', 'url', 4, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (15, 'social_whatsapp', '', 'WhatsApp number', 'social', 'text', 5, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (16, 'meta_title', 'Grow Farm', 'Default meta title', 'seo', 'text', 1, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (17, 'meta_description', 'Premium farmhouse plots near Pali, Maharashtra — designed for peaceful living, smart investment, and future generations.', 'Default meta description', 'seo', 'textarea', 2, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
-  (18, 'copyright_text', '©2026 Grow Farms. All rights reserved.', 'Copyright line', 'general', 'text', 3, '2026-09-02 12:00:00', '2026-09-02 12:00:00');
+  (11, 'meta_title', 'Grow Farm', 'Default meta title', 'seo', 'text', 1, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
+  (12, 'meta_description', 'Premium farmhouse plots near Pali, Maharashtra — designed for peaceful living, smart investment, and future generations.', 'Default meta description', 'seo', 'textarea', 2, '2026-09-02 12:00:00', '2026-09-02 12:00:00'),
+  (13, 'copyright_text', '©2026 Grow Farms. All rights reserved.', 'Copyright line', 'general', 'text', 3, '2026-09-02 12:00:00', '2026-09-02 12:00:00');
 
 
 SET FOREIGN_KEY_CHECKS = 1;

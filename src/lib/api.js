@@ -98,6 +98,7 @@ export const getBuyingSteps = (params, signal) => safeGet("/buying-steps", param
 export const getWhyPaliSlides = (signal) => safeGet("/why-pali-slides", null, signal);
 export const getWhyChooseCards = (params, signal) => safeGet("/why-choose-cards", params, signal);
 export const getPhilosophyCards = (signal) => safeGet("/philosophy-cards", null, signal);
+export const getSocialLinks = (signal) => safeGet("/social-links", null, signal);
 
 /**
  * Settings and content blocks are wanted by several components at once (the

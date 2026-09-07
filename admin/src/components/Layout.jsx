@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Map, Package, Tags, FileText, Inbox, Image, Sparkles,
   HelpCircle, Quote, Compass, Route, ListOrdered, Heart, Settings as Cog,
-  User, LogOut, Menu, ExternalLink, Building2, ChevronDown, LayoutTemplate,
+  User, LogOut, Menu, ExternalLink, Building2, ChevronDown, LayoutTemplate, Share2,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +41,7 @@ const NAV = [
       { to: "/cms/why-choose-cards", label: "Why Choose Cards", icon: Heart },
       { to: "/cms/buying-steps", label: "Buying Steps", icon: ListOrdered },
       { to: "/cms/philosophy-cards", label: "Core Philosophy", icon: Heart },
+      { to: "/cms/social-links", label: "Social Media Links", icon: Share2 },
     ],
   },
   {

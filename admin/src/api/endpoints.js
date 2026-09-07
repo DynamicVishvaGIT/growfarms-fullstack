@@ -96,10 +96,10 @@ export const settings = {
   bulkUpdate: (map) => api.put("/settings", { settings: map }),
 };
 
-/* ── The nine simple CMS lists ───────────────────────────────────────────── */
+/* ── The ten simple CMS lists ───────────────────────────────────────────── */
 
 /**
- * All nine share the factory-built controller on the server, so one client
+ * All ten share the factory-built controller on the server, so one client
  * factory mirrors it exactly.
  */
 function cmsResource(path) {
@@ -123,6 +123,7 @@ export const whyChooseCards = cmsResource("why-choose-cards");
 export const philosophyCards = cmsResource("philosophy-cards");
 export const faqs = cmsResource("faqs");
 export const testimonials = cmsResource("testimonials");
+export const socialLinks = cmsResource("social-links");
 
 /** Look a CMS resource up by the slug used in the admin route. */
 export const cmsRegistry = {
@@ -135,4 +136,5 @@ export const cmsRegistry = {
   "philosophy-cards": philosophyCards,
   faqs,
   testimonials,
+  "social-links": socialLinks,
 };

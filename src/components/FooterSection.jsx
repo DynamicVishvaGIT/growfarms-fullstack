@@ -1,24 +1,29 @@
 import { Link } from "react-router-dom";
 import logo_img from "../assets/images/grow-farms-logo.png";
 import useApiData from "../hooks/useApiData";
+import SocialLinks from "./SocialLinks";
 import { getContent, getSettings, contentBlock } from "../lib/api";
 
 /* The footer as it ships today — every value below is the fallback. */
 const FALLBACK_FOOTER = {
   watermark: "GROW FARMS",
   navigation: [
-    { label: "Home", url: "/" },
+    // { label: "Home", url: "/" },
     { label: "About us", url: "/about" },
-    { label: "Testimonials", url: "/testimonials" },
     { label: "Blog", url: "/blogs" },
+    { label: "Contact", url: "/contact-us" },
+    { label: "Sitemap", url: "/https://growfarms.co/sitemap.xml" },
   ],
   projects: [
     { label: "Sky Breeze", url: "/details/skybreez" },
     { label: "Sarasview", url: "/details/sarasview" },
   ],
+
   address:
     "Grow Farms 305, The Landmark, Next to Hotel Three Star, Sector 7, Kharghar, Navi Mumbai, Maharashtra 410210",
-  copyright: "©2026 Grow Farms. All rights reserved.",
+  email: "info@growfarms.co",
+  phone: "+91 00000 00000",
+  copyright: "© 2026 Grow Farms. All rights reserved. | Design by Dynamic Vishva",
 };
 
 const FooterSection = () => {
@@ -37,6 +42,8 @@ const FooterSection = () => {
       navigation: extra.navigation?.length ? extra.navigation : FALLBACK_FOOTER.navigation,
       projects: extra.projects?.length ? extra.projects : FALLBACK_FOOTER.projects,
       address: settings?.contact_address || block?.body || FALLBACK_FOOTER.address,
+      email: settings?.contact_email || FALLBACK_FOOTER.email,
+      phone: settings?.contact_phone || FALLBACK_FOOTER.phone,
       copyright: settings?.copyright_text || extra.copyright || FALLBACK_FOOTER.copyright,
       logo: settings?.site_logo || null,
     };
@@ -63,16 +70,18 @@ const FooterSection = () => {
         style={{ padding: "clamp(3rem, 5vw, 5rem) clamp(1.5rem, 6vw, 5rem)" }}
       >
         {/* Main Grid: 2 columns on mobile, custom grid on desktop */}
-        <div className="grid grid-cols-2 md:grid-cols-[200px_1fr_1fr_1.6fr] gap-x-6 gap-y-8 md:gap-12 items-start mb-10 md:mb-14">
-          
-          {/* Logo — full width on mobile */}
-          <div className="col-span-2 md:col-span-1 flex flex-col items-start">
-            <img
-              src={footer.logo || logo_img}
-              alt="Grow Farms"
-              className="h-[70px] w-auto object-contain"
-            />
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-[200px_1fr_1fr_1.6fr] gap-x-6 gap-y-8 md:gap-12 items-start">
+
+       {/* Logo — full width on mobile */}
+<div className="col-span-2 md:col-span-1 flex flex-col items-start">
+  <Link to="/">
+    <img
+      src={footer.logo || logo_img}
+      alt="Grow Farms"
+      className="h-[70px] w-auto object-contain cursor-pointer"
+    />
+  </Link>
+</div>
 
           {/* Navigation — left side on mobile */}
           <div className="col-span-1">
@@ -120,18 +129,53 @@ const FooterSection = () => {
 
           {/* Address — full width on mobile */}
           <div className="col-span-2 md:col-span-1">
-            <h3
-              className="mb-4 text-white"
-              style={{ fontSize: "1.05rem", fontWeight: 500, letterSpacing: "0.02em" }}
-            >
-              Reach to us
-            </h3>
-            <p className="text-white/65 text-sm leading-7 max-w-[300px]">
-              {footer.address}
-            </p>
-          </div>
+  <h3
+    className="mb-4 text-white"
+    style={{
+      fontSize: "1.05rem",
+      fontWeight: 500,
+      letterSpacing: "0.02em",
+    }}
+  >
+    Reach to us
+  </h3>
+
+  {/* Address */}
+  <p className="text-white/65 text-sm leading-7 max-w-[300px] mb-3">
+    {footer.address}
+  </p>
+
+  {/* Email */}
+  <a
+    href={`mailto:${footer.email}`}
+    className="block text-white/65 text-sm hover:text-white transition-colors duration-200 mb-2"
+  >
+    {footer.email}
+  </a>
+
+  {/* Contact */}
+  <a
+    href={`tel:${footer.phone}`}
+    className="block text-white/65 text-sm hover:text-white transition-colors duration-200"
+  >
+    {footer.phone}
+  </a>
+</div>
 
         </div>
+
+        {/* Follow us — its own full-width row rather than a fifth grid column,
+            so all six icons sit on one line on desktop and wrap cleanly on
+            mobile. Renders nothing at all when no link is active.
+
+            The bottom margin is sized against the copyright below, which is
+            pulled upward (bottom-5, lg:bottom-15) to sit over the watermark:
+            the margin has to cover that offset before it buys any clearance,
+            so it steps up at lg for the same reason the offset does. */}
+        <SocialLinks
+          className="mb-12 flex flex-col gap-4
+             items-start md:items-end"
+        />
 
         {/* Divider + Copyright */}
         <div className="relative bottom-5 lg:bottom-15">

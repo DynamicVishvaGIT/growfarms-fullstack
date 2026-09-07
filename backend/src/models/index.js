@@ -25,6 +25,7 @@ const WhyChooseCard = require("./WhyChooseCard")(sequelize);
 const PhilosophyCard = require("./PhilosophyCard")(sequelize);
 const Faq = require("./Faq")(sequelize);
 const Testimonial = require("./Testimonial")(sequelize);
+const SocialLink = require("./SocialLink")(sequelize);
 
 const Blog = require("./Blog")(sequelize);
 const BlogChecklist = require("./BlogChecklist")(sequelize);
@@ -138,6 +139,7 @@ const db = {
   PhilosophyCard,
   Faq,
   Testimonial,
+  SocialLink,
   Blog,
   BlogChecklist,
   Enquiry,

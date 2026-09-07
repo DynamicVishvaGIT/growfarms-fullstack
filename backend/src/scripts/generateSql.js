@@ -42,6 +42,7 @@ const ORDER = [
   "PhilosophyCard",
   "Faq",
   "Testimonial",
+  "SocialLink",
   "Blog",
   "BlogChecklist",
   "Enquiry",
@@ -378,6 +379,14 @@ function buildSeed() {
     insert(
       "testimonials",
       data.testimonials.map((t, i) => stamp({ id: i + 1, is_active: 1, ...t })),
+    ),
+  );
+
+  lines.push("-- ── social_links ──");
+  lines.push(
+    insert(
+      "social_links",
+      data.socialLinks.map((l, i) => stamp({ id: i + 1, ...l })),
     ),
   );
 

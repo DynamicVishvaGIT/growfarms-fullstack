@@ -354,6 +354,26 @@ const whyChooseCards = [
   },
 ];
 
+/* ── Social links ──────────────────────────────────────────────────────────── */
+
+/**
+ * The one seed block with nothing behind it in the frontend: the footer has
+ * never carried social icons, so there are no real account URLs to lift.
+ *
+ * Every row is therefore seeded INACTIVE and points at the platform's home
+ * page. The public endpoint serves active rows only, so the footer shows no
+ * social section at all until someone replaces a URL and ticks Active — which
+ * is the right default, since a placeholder link is worse than no link.
+ */
+const socialLinks = [
+  { name: "Facebook", platform: "facebook", url: "https://www.facebook.com/", sort_order: 1, is_active: false },
+  { name: "Instagram", platform: "instagram", url: "https://www.instagram.com/", sort_order: 2, is_active: false },
+  { name: "YouTube", platform: "youtube", url: "https://www.youtube.com/", sort_order: 3, is_active: false },
+  { name: "X (Twitter)", platform: "twitter", url: "https://x.com/", sort_order: 4, is_active: false },
+  { name: "LinkedIn", platform: "linkedin", url: "https://www.linkedin.com/", sort_order: 5, is_active: false },
+  { name: "WhatsApp", platform: "whatsapp", url: "https://wa.me/", sort_order: 6, is_active: false },
+];
+
 /* ── Core philosophy — from CorePhilosophy.jsx `cards` ───────────────────── */
 
 const philosophyCards = [
@@ -743,12 +763,6 @@ const settings = [
     sort_order: 6,
   },
 
-  { key: "social_facebook", value: "", label: "Facebook", group: "social", type: "url", sort_order: 1 },
-  { key: "social_instagram", value: "", label: "Instagram", group: "social", type: "url", sort_order: 2 },
-  { key: "social_youtube", value: "", label: "YouTube", group: "social", type: "url", sort_order: 3 },
-  { key: "social_linkedin", value: "", label: "LinkedIn", group: "social", type: "url", sort_order: 4 },
-  { key: "social_whatsapp", value: "", label: "WhatsApp number", group: "social", sort_order: 5 },
-
   { key: "meta_title", value: "Grow Farm", label: "Default meta title", group: "seo", sort_order: 1 },
   {
     key: "meta_description",
@@ -781,6 +795,7 @@ module.exports = {
   philosophyCards,
   faqs,
   testimonials,
+  socialLinks,
   blogs,
   websiteContent,
   settings,

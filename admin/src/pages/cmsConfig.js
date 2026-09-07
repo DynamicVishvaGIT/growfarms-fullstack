@@ -1,5 +1,5 @@
 /**
- * Declarative descriptions of the nine simple CMS lists.
+ * Declarative descriptions of the ten simple CMS lists.
  *
  * Each entry names the fields, so one page component (CmsList) can render a
  * table and an edit form for every resource without nine bespoke screens.
@@ -215,6 +215,38 @@ export const CMS_CONFIG = {
       ACTIVE,
     ],
   },
+
+  "social-links": {
+    title: "Social Media Links",
+    subtitle: "The icon row in the website footer.",
+    singular: "Social link",
+    columns: ["name", "platform", "url", "sort_order", "is_active"],
+    fields: [
+      TEXT("name", "Platform name", { required: true, placeholder: "Facebook" }),
+      SELECT(
+        "platform",
+        "Icon",
+        [
+          ["facebook", "Facebook"],
+          ["instagram", "Instagram"],
+          ["youtube", "YouTube"],
+          ["twitter", "X (Twitter)"],
+          ["linkedin", "LinkedIn"],
+          ["whatsapp", "WhatsApp"],
+          ["other", "Other (generic link icon)"],
+        ],
+        { hint: "Chooses which icon the footer draws. The name above is what screen readers announce." },
+      ),
+      TEXT("url", "Profile URL", {
+        required: true,
+        placeholder: "https://www.facebook.com/growfarms",
+        hint: "Paste the full link, including https://. For WhatsApp a plain phone number works too.",
+      }),
+      SORT,
+      ACTIVE,
+    ],
+    note: "Only active links appear on the site, and the footer's social row is hidden entirely while none are active. The rows that ship with the site point at each platform's home page — replace the URL with your own profile before switching one on.",
+  },
 };
 
 /** Human-readable column headers for the generic table. */
@@ -225,6 +257,8 @@ export const COLUMN_LABELS = {
   label: "Label",
   question: "Question",
   icon_key: "Icon",
+  platform: "Icon",
+  url: "URL",
   youtube_id: "Video ID",
   author_name: "Customer",
   step_number: "No.",

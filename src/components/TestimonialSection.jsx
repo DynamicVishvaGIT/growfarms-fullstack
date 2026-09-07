@@ -39,7 +39,8 @@ const TestimonialSection = () => {
 
         {/* Re-enable on the link */}
         <a
-          href="#"
+          href="https://www.youtube.com/@GrowFarms00"
+          target="_blank"
           className="text-white/80 hover:text-white transition-colors"
           style={{
             fontSize: "clamp(0.85rem, 1vw, 1rem)",

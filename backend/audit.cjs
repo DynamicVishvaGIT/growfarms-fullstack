@@ -90,6 +90,7 @@ const PUBLIC_READS = [
   ["/why-pali-slides", "why pali slides"],
   ["/why-choose-cards", "why choose cards"],
   ["/philosophy-cards", "philosophy cards"],
+  ["/social-links", "social links"],
   ["/content?grouped=true", "website content"],
   ["/settings", "settings"],
 ];
@@ -142,6 +143,7 @@ const RESOURCES = [
   { path: "why-choose-cards", create: { title: "Audit card", position: "left" }, edit: ["title", "Audit card edited"] },
   { path: "philosophy-cards", create: { title: "Audit philosophy" }, edit: ["title", "Audit philosophy edited"] },
   { path: "testimonials", create: { youtube_id: "AUDITVIDEO", author_name: "Audit" }, edit: ["author_name", "Audit edited"] },
+  { path: "social-links", create: { name: "Audit social", platform: "facebook", url: "https://example.com/audit" }, edit: ["name", "Audit social edited"] },
 ];
 
 async function writeRoundTrips() {

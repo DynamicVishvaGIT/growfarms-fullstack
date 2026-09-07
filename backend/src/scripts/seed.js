@@ -199,6 +199,11 @@ async function seedSimpleLists() {
   for (const t of data.testimonials) {
     await ensure(db.Testimonial, { youtube_id: t.youtube_id }, t);
   }
+
+  console.log("\n[seed] social links");
+  for (const l of data.socialLinks) {
+    await ensure(db.SocialLink, { platform: l.platform }, l);
+  }
 }
 
 async function seedBlogs(categoryMap) {
@@ -253,7 +258,7 @@ async function wipe() {
     db.ProjectImage, db.ProjectAmenity,
     db.Facility, db.TravelRoute, db.WhyChooseCard, db.Faq,
     db.BlogChecklist, db.Blog,
-    db.BuyingStep, db.WhyPaliSlide, db.PhilosophyCard, db.Testimonial,
+    db.BuyingStep, db.WhyPaliSlide, db.PhilosophyCard, db.Testimonial, db.SocialLink,
     db.Amenity, db.WebsiteContent, db.Setting,
     db.Project, db.Category,
   ];
