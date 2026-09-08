@@ -20,6 +20,9 @@ pipeline {
         stage('Verify Source') {
             steps {
                 sh '''
+                    echo "===== COMMIT ====="
+                    git log -1 --format="%H%n%ad%n%s" --date=iso
+
                     echo "===== PROJECT ====="
                     pwd
                     ls -la
@@ -29,6 +32,9 @@ pipeline {
 
                     echo "===== FRONTEND ====="
                     ls -la src
+
+                    echo "===== ADMIN ====="
+                    ls -la admin/src/pages
                 '''
             }
         }
@@ -61,6 +67,13 @@ pipeline {
             steps {
                 sh '''
                     docker compose ps
+
+                    # The admin panel is a separate Vite build copied into the
+                    # image at /usr/share/nginx/html/admin. If that build ever
+                    # silently drops out of Dockerfile.frontend again, the site
+                    # still comes up green — so assert it landed.
+                    echo "===== ADMIN BUNDLE ====="
+                    docker exec growfarms-frontend ls /usr/share/nginx/html/admin
 
                     echo "===== BACKEND LOGS ====="
                     docker logs --tail 50 growfarms-backend || true
