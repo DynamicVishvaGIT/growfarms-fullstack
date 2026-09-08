@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Map, Package, Tags, FileText, Inbox, Image, Sparkles,
   HelpCircle, Quote, Compass, Route, ListOrdered, Heart, Settings as Cog,
   User, LogOut, Menu, ExternalLink, Building2, ChevronDown, LayoutTemplate, Share2,
-  Contact, Landmark,
+  Contact, Landmark, MapPinned,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -36,6 +36,7 @@ const NAV = [
     items: [
       { to: "/blogs", label: "Blogs", icon: FileText },
       { to: "/content", label: "Website Content", icon: Image },
+      { to: "/aerial-map", label: "Aerial Map", icon: MapPinned },
       { to: "/about-page", label: "About Page", icon: Landmark },
       { to: "/contact-page", label: "Contact Page", icon: Contact },
       { to: "/cms/faqs", label: "FAQs", icon: HelpCircle },

@@ -5,7 +5,7 @@ import home_banner_2 from "../assets/images/home_banner_2.jpg";
 import { useNavigate } from "react-router-dom";
 import EnquiryModal from "./EnquiryModal";
 import useApiData from "../hooks/useApiData";
-import { getMapPins } from "../lib/api";
+import { getMapPins, getContent, contentBlock } from "../lib/api";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -59,6 +59,15 @@ const FALLBACK_PINS = [
   },
 ];
 
+/**
+ * The aerial photograph as it shipped. It is now editable in
+ * Admin -> Aerial Map; clearing it there restores exactly this.
+ */
+const FALLBACK_MAP = {
+  image: home_banner_2,
+  alt: "Aerial farmland view",
+};
+
 const ZOOM_SCALE = 1.3;
 
 /**
@@ -94,6 +103,22 @@ export default function AerialMapSection() {
       return usable.length ? usable.map(toPin) : null;
     },
     FALLBACK_PINS,
+  );
+
+  // The background photograph. Its own request, so a missing block leaves the
+  // pins alone and vice versa.
+  const { data: map } = useApiData(
+    async (signal) => {
+      const grouped = await getContent("home", signal);
+      const block = contentBlock(grouped, "home", "aerial_map");
+      if (!block) return null;
+      return {
+        image: block.image_url || FALLBACK_MAP.image,
+        alt: String(block.title || "").trim() || FALLBACK_MAP.alt,
+      };
+    },
+    FALLBACK_MAP,
+    [],
   );
 
   const [displayPositions, setDisplayPositions] = useState(() =>
@@ -385,8 +410,8 @@ export default function AerialMapSection() {
         >
           <img
             ref={imgRef}
-            src={home_banner_2}
-            alt="Aerial farmland view"
+            src={map.image}
+            alt={map.alt}
             draggable={false}
             onLoad={() => {
               if (imgRef.current) {

@@ -23,6 +23,8 @@ export const dashboard = {
 export const projects = {
   list: (params) => api.get("/projects", params),
   get: (idOrSlug) => api.get(`/projects/${idOrSlug}`),
+  // The pins the home-page aerial map draws, so its editor can preview them.
+  mapPins: () => api.get("/projects/map"),
   create: (values) => api.postForm("/projects", toFormData(values)),
   update: (id, values) => api.putForm(`/projects/${id}`, toFormData(values)),
   remove: (id) => api.del(`/projects/${id}`),

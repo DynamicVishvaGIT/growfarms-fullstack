@@ -19,6 +19,7 @@ import Enquiries from "./pages/Enquiries";
 import Content from "./pages/Content";
 import ContactPage from "./pages/ContactPage";
 import AboutPage from "./pages/AboutPage";
+import AerialMapSection from "./pages/AerialMapSection";
 import CmsList from "./pages/CmsList";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
@@ -82,6 +83,7 @@ export default function App() {
             <Route path="content" element={<Content />} />
             <Route path="contact-page" element={<ContactPage />} />
             <Route path="about-page" element={<AboutPage />} />
+            <Route path="aerial-map" element={<AerialMapSection />} />
 
             {/* One page serves all nine simple CMS lists. */}
             <Route path="cms/:resource" element={<CmsList />} />

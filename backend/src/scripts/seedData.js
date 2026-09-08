@@ -561,6 +561,16 @@ const websiteContent = [
       "Lush greenery, clean air, and space to breathe — right at your doorstep, near Mumbai.",
     sort_order: 3,
   },
+  /* Home — AerialMapSection.jsx background */
+  {
+    page: "home",
+    section_key: "aerial_map",
+    label: "Aerial map — background image",
+    // Used as the image's alt text; the section draws no heading of its own.
+    title: "Aerial farmland view",
+    image: IMG("home_banner_2.jpg"),
+    sort_order: 4,
+  },
   /* Home — TestimonialSection.jsx */
   {
     page: "home",
@@ -570,7 +580,7 @@ const websiteContent = [
     subtitle: "A place that grows in value while giving peace today.",
     link_label: "View All",
     link_url: "/testimonials",
-    sort_order: 4,
+    sort_order: 5,
   },
 
   /* About — About.jsx hero */
