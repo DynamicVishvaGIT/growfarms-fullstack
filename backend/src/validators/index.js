@@ -180,6 +180,16 @@ const blogRules = [
   body("status").optional().isIn(["draft", "published"]).withMessage("Invalid status"),
   body("excerpt").optional({ values: "falsy" }).isLength({ max: 500 })
     .withMessage("Excerpt must be under 500 characters"),
+  body("sub_heading").optional({ values: "falsy" }).isLength({ max: 240 })
+    .withMessage("Sub heading must be under 240 characters"),
+  body("hero_title").optional({ values: "falsy" }).isLength({ max: 240 })
+    .withMessage("Hero title must be under 240 characters"),
+  body("hero_subtitle").optional({ values: "falsy" }).isLength({ max: 400 })
+    .withMessage("Hero subtitle must be under 400 characters"),
+  body("quote_text").optional({ values: "falsy" }).isLength({ max: 1000 })
+    .withMessage("Quote must be under 1000 characters"),
+  body("quote_author").optional({ values: "falsy" }).isLength({ max: 160 })
+    .withMessage("Quote attribution must be under 160 characters"),
 ];
 
 const categoryRules = [

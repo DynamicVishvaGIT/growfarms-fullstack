@@ -31,6 +31,9 @@ const WRITABLE = [
   "about_eyebrow",
   "about_title",
   "about_body",
+  "why_choose_eyebrow",
+  "why_choose_title",
+  "why_choose_body",
   "invest_title",
   "invest_body",
 ];

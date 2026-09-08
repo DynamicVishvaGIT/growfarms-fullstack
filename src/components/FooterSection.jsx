@@ -8,11 +8,10 @@ import { getContent, getSettings, contentBlock } from "../lib/api";
 const FALLBACK_FOOTER = {
   watermark: "GROW FARMS",
   navigation: [
-    // { label: "Home", url: "/" },
     { label: "About us", url: "/about" },
     { label: "Blog", url: "/blogs" },
-    { label: "Contact", url: "/contact-us" },
-    { label: "Sitemap", url: "/https://growfarms.co/sitemap.xml" },
+    { label: "Contact", url: "/contact" },
+    { label: "Sitemap", url: "https://growfarms.co/sitemap.xml" },
   ],
   projects: [
     { label: "Sky Breeze", url: "/details/skybreez" },
@@ -23,7 +22,8 @@ const FALLBACK_FOOTER = {
     "Grow Farms 305, The Landmark, Next to Hotel Three Star, Sector 7, Kharghar, Navi Mumbai, Maharashtra 410210",
   email: "info@growfarms.co",
   phone: "+91 00000 00000",
-  copyright: "© 2026 Grow Farms. All rights reserved. | Design by Dynamic Vishva",
+  copyright:
+    "© 2026 Grow Farms. All rights reserved. | Design by Dynamic Vishva",
 };
 
 const FooterSection = () => {
@@ -39,16 +39,22 @@ const FooterSection = () => {
     const extra = block?.extra_data || {};
     return {
       watermark: block?.title || FALLBACK_FOOTER.watermark,
-      navigation: extra.navigation?.length ? extra.navigation : FALLBACK_FOOTER.navigation,
-      projects: extra.projects?.length ? extra.projects : FALLBACK_FOOTER.projects,
-      address: settings?.contact_address || block?.body || FALLBACK_FOOTER.address,
+      navigation: navigation?.length ? navigation : FALLBACK_FOOTER.navigation,
+      projects: extra.projects?.length
+        ? extra.projects
+        : FALLBACK_FOOTER.projects,
+      address:
+        settings?.contact_address || block?.body || FALLBACK_FOOTER.address,
       // The primary pair from Settings → Contact details, which is the same
       // pair the contact page leads with. There is no `contact_email` /
       // `contact_phone` key — reading those was why the footer ignored the
       // admin panel and always showed the fallbacks below.
       email: settings?.contact_email_1 || FALLBACK_FOOTER.email,
       phone: settings?.contact_phone_1 || FALLBACK_FOOTER.phone,
-      copyright: settings?.copyright_text || extra.copyright || FALLBACK_FOOTER.copyright,
+      copyright:
+        settings?.copyright_text ||
+        extra.copyright ||
+        FALLBACK_FOOTER.copyright,
       logo: settings?.site_logo || null,
     };
   }, FALLBACK_FOOTER);
@@ -75,37 +81,54 @@ const FooterSection = () => {
       >
         {/* Main Grid: 2 columns on mobile, custom grid on desktop */}
         <div className="grid grid-cols-2 md:grid-cols-[200px_1fr_1fr_1.6fr] gap-x-6 gap-y-8 md:gap-12 items-start">
-
-       {/* Logo — full width on mobile */}
-<div className="col-span-2 md:col-span-1 flex flex-col items-start">
-  <Link to="/">
-    <img
-      src={footer.logo || logo_img}
-      alt="Grow Farms"
-      className="h-[70px] w-auto object-contain cursor-pointer"
-    />
-  </Link>
-</div>
+          {/* Logo — full width on mobile */}
+          <div className="col-span-2 md:col-span-1 flex flex-col items-start">
+            <Link to="/">
+              <img
+                src={footer.logo || logo_img}
+                alt="Grow Farms"
+                className="h-[70px] w-auto object-contain cursor-pointer"
+              />
+            </Link>
+          </div>
 
           {/* Navigation — left side on mobile */}
           <div className="col-span-1">
             <h3
               className="mb-4 text-white"
-              style={{ fontSize: "1.05rem", fontWeight: 500, letterSpacing: "0.02em" }}
+              style={{
+                fontSize: "1.05rem",
+                fontWeight: 500,
+                letterSpacing: "0.02em",
+              }}
             >
               Navigation
             </h3>
             <ul className="space-y-2.5">
-              {footer.navigation.map((item) => (
-                <li key={item.label}>
-                  <Link
-                    to={item.url || "/"}
-                    className="text-white/65 text-sm hover:text-white transition-colors duration-200"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
+              {footer.navigation.map((item) => {
+                const isExternal = /^https?:\/\//.test(item.url);
+                return (
+                  <li key={item.label}>
+                    {isExternal ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white/65 text-sm hover:text-white transition-colors duration-200"
+                      >
+                        {item.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={item.url || "/"}
+                        className="text-white/65 text-sm hover:text-white transition-colors duration-200"
+                      >
+                        {item.label}
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -113,7 +136,11 @@ const FooterSection = () => {
           <div className="col-span-1">
             <h3
               className="mb-4 text-white"
-              style={{ fontSize: "1.05rem", fontWeight: 500, letterSpacing: "0.02em" }}
+              style={{
+                fontSize: "1.05rem",
+                fontWeight: 500,
+                letterSpacing: "0.02em",
+              }}
             >
               Our Projects
             </h3>
@@ -133,39 +160,38 @@ const FooterSection = () => {
 
           {/* Address — full width on mobile */}
           <div className="col-span-2 md:col-span-1">
-  <h3
-    className="mb-4 text-white"
-    style={{
-      fontSize: "1.05rem",
-      fontWeight: 500,
-      letterSpacing: "0.02em",
-    }}
-  >
-    Reach to us
-  </h3>
+            <h3
+              className="mb-4 text-white"
+              style={{
+                fontSize: "1.05rem",
+                fontWeight: 500,
+                letterSpacing: "0.02em",
+              }}
+            >
+              Reach to us
+            </h3>
 
-  {/* Address */}
-  <p className="text-white/65 text-sm leading-7 max-w-[300px] mb-3">
-    {footer.address}
-  </p>
+            {/* Address */}
+            <p className="text-white/65 text-sm leading-7 max-w-[300px] mb-3">
+              {footer.address}
+            </p>
 
-  {/* Email */}
-  <a
-    href={`mailto:${footer.email}`}
-    className="block text-white/65 text-sm hover:text-white transition-colors duration-200 mb-2"
-  >
-    {footer.email}
-  </a>
+            {/* Email */}
+            <a
+              href={`mailto:${footer.email}`}
+              className="block text-white/65 text-sm hover:text-white transition-colors duration-200 mb-2"
+            >
+              {footer.email}
+            </a>
 
-  {/* Contact */}
-  <a
-    href={`tel:${footer.phone}`}
-    className="block text-white/65 text-sm hover:text-white transition-colors duration-200"
-  >
-    {footer.phone}
-  </a>
-</div>
-
+            {/* Contact */}
+            <a
+              href={`tel:${footer.phone}`}
+              className="block text-white/65 text-sm hover:text-white transition-colors duration-200"
+            >
+              {footer.phone}
+            </a>
+          </div>
         </div>
 
         {/* Follow us — its own full-width row rather than a fifth grid column,
@@ -177,8 +203,8 @@ const FooterSection = () => {
             the margin has to cover that offset before it buys any clearance,
             so it steps up at lg for the same reason the offset does. */}
         <SocialLinks
-          className="mb-12 flex flex-col gap-4
-             items-start md:items-end"
+          className="mb-12 flex flex-col gap-4 relative
+             items-start md:items-end lg:top-1 lg:right-12 mt-4"
         />
 
         {/* Divider + Copyright */}
@@ -187,7 +213,6 @@ const FooterSection = () => {
             {footer.copyright}
           </p>
         </div>
-
       </div>
     </footer>
   );

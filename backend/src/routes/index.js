@@ -244,6 +244,7 @@ router.post(
   blogUpload.fields([
     { name: "featured_image", maxCount: 1 },
     { name: "banner_image", maxCount: 1 },
+    { name: "images", maxCount: 12 },
   ]),
   V.blogRules,
   validate,
@@ -255,6 +256,7 @@ router.put(
   blogUpload.fields([
     { name: "featured_image", maxCount: 1 },
     { name: "banner_image", maxCount: 1 },
+    { name: "images", maxCount: 12 },
   ]),
   V.idParam,
   V.blogRules,
@@ -269,6 +271,16 @@ router.delete(
   validate,
   blogController.remove,
 );
+
+// The in-article gallery. Uploads ride the form save too; these exist so an
+// image can be added or dropped without re-submitting the whole post.
+router.post(
+  "/blogs/:id/images",
+  requireAuth,
+  blogUpload.array("images", 12),
+  blogController.addImages,
+);
+router.delete("/blogs/:id/images/:imageId", requireAuth, blogController.removeImage);
 
 /* ══ Enquiries ═══════════════════════════════════════════════════════════ */
 

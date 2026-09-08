@@ -265,19 +265,36 @@ export default function HowToBuyFarmLand() {
     });
   }, FALLBACK_STEPS, [project?.id]);
 
+  // Only one card is open at a time, so the first step ticked "Open by default"
+  // in Admin is the one that wins.
   const initialOpen = STEPS.findIndex((s) => s.defaultOpen);
-  const [openDesktop, setOpenDesktop] = useState(
-    initialOpen === -1 ? null : initialOpen
-  );
-  const [openMobile, setOpenMobile] = useState(
-    initialOpen === -1 ? null : initialOpen
-  );
+  const openAtStart = initialOpen === -1 ? null : initialOpen;
+
+  /*
+   * What is open is derived, not captured.
+   *
+   * `useState(openAtStart)` reads its argument on the first render only, and
+   * the steps arrive a moment after that — the built-in four render first and
+   * the CMS list replaces them. Seeding the state meant the card that opened
+   * was whichever one the built-in list marks, so the admin's "Open by
+   * default" tick never took effect and unticking every step still left one
+   * open.
+   *
+   * `undefined` means the visitor has not touched the cards yet, so the CMS
+   * default applies — and keeps applying once the real steps land. Anything
+   * else is their own choice, which then survives the swap.
+   */
+  const [chosenDesktop, setChosenDesktop] = useState(undefined);
+  const [chosenMobile, setChosenMobile] = useState(undefined);
+
+  const openDesktop = chosenDesktop === undefined ? openAtStart : chosenDesktop;
+  const openMobile = chosenMobile === undefined ? openAtStart : chosenMobile;
 
   const handleDesktopToggle = (i) =>
-    setOpenDesktop((prev) => (prev === i ? null : i));
+    setChosenDesktop(openDesktop === i ? null : i);
 
   const handleMobileToggle = (i) =>
-    setOpenMobile((prev) => (prev === i ? null : i));
+    setChosenMobile(openMobile === i ? null : i);
 
   useEffect(() => {
     const section = sectionRef.current;

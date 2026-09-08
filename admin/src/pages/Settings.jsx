@@ -28,6 +28,8 @@ const USED_BY = {
   contact_phone_1: "Footer, and the first entry on the contact page",
   contact_phone_2: "Contact page only",
   contact_address: "Footer, and the contact page",
+  google_map_embed: "The map at the bottom of the contact page",
+  google_map_link: "Opened by the contact page's address card and the map's button",
   copyright_text: "Footer",
   site_logo: "Footer",
 };
@@ -127,6 +129,14 @@ export default function Settings() {
           </button>
         ))}
       </div>
+
+      {group === "contact" && (
+        <Alert tone="info">
+          These values feed the footer and the contact page's cards. The cards themselves —
+          their headings, which lines they show and where their arrows link — are on{" "}
+          <Link to="/contact-page">Contact Page</Link>, along with the map.
+        </Alert>
+      )}
 
       {group === "social" && (
         <Alert tone="info">

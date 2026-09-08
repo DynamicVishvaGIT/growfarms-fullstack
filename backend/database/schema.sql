@@ -74,6 +74,9 @@ CREATE TABLE IF NOT EXISTS `projects` (
   `about_image_2` VARCHAR(255),
   `about_image_3` VARCHAR(255),
   `about_image_4` VARCHAR(255),
+  `why_choose_eyebrow` VARCHAR(80),
+  `why_choose_title` VARCHAR(200),
+  `why_choose_body` TEXT,
   `invest_title` VARCHAR(200),
   `invest_body` TEXT,
   `invest_image` VARCHAR(255),
@@ -393,6 +396,12 @@ CREATE TABLE IF NOT EXISTS `blogs` (
   `title` VARCHAR(240) NOT NULL,
   `excerpt` VARCHAR(500),
   `content` LONGTEXT,
+  `hero_title` VARCHAR(240),
+  `hero_subtitle` VARCHAR(400),
+  `sub_heading` VARCHAR(240),
+  `second_description` TEXT,
+  `quote_text` TEXT,
+  `quote_author` VARCHAR(160),
   `featured_image` VARCHAR(255),
   `banner_image` VARCHAR(255),
   `category_id` INTEGER UNSIGNED,
@@ -429,6 +438,59 @@ CREATE TABLE IF NOT EXISTS `blog_checklist` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE INDEX `blog_checklist_blog_id` ON `blog_checklist` (`blog_id`);
+
+-- ─────────────────────────────────────────────────────────────────────
+--  blog_images
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `blog_images` (
+  `id` INTEGER UNSIGNED auto_increment ,
+  `blog_id` INTEGER UNSIGNED NOT NULL,
+  `image_path` VARCHAR(255) NOT NULL,
+  `alt_text` VARCHAR(200),
+  `sort_order` INTEGER NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`blog_id`) REFERENCES `blogs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE INDEX `blog_images_blog_id` ON `blog_images` (`blog_id`);
+
+-- ─────────────────────────────────────────────────────────────────────
+--  blog_steps
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `blog_steps` (
+  `id` INTEGER UNSIGNED auto_increment ,
+  `blog_id` INTEGER UNSIGNED NOT NULL,
+  `step_number` VARCHAR(6) NOT NULL,
+  `title` VARCHAR(160) NOT NULL,
+  `description` TEXT,
+  `sort_order` INTEGER NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`blog_id`) REFERENCES `blogs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE INDEX `blog_steps_blog_id` ON `blog_steps` (`blog_id`);
+
+-- ─────────────────────────────────────────────────────────────────────
+--  blog_related
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `blog_related` (
+  `id` INTEGER UNSIGNED auto_increment ,
+  `blog_id` INTEGER UNSIGNED NOT NULL,
+  `related_blog_id` INTEGER UNSIGNED NOT NULL,
+  `sort_order` INTEGER NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`blog_id`) REFERENCES `blogs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (`related_blog_id`) REFERENCES `blogs` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE UNIQUE INDEX `blog_related_blog_id_related_blog_id` ON `blog_related` (`blog_id`, `related_blog_id`);
+CREATE INDEX `blog_related_blog_id` ON `blog_related` (`blog_id`);
 
 -- ─────────────────────────────────────────────────────────────────────
 --  enquiries

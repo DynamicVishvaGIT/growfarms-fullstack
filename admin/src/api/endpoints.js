@@ -68,6 +68,12 @@ export const blogs = {
   create: (values) => api.postForm("/blogs", toFormData(values)),
   update: (id, values) => api.putForm(`/blogs/${id}`, toFormData(values)),
   remove: (id) => api.del(`/blogs/${id}`),
+  addImages: (id, files) => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("images", f));
+    return api.postForm(`/blogs/${id}/images`, fd);
+  },
+  removeImage: (id, imageId) => api.del(`/blogs/${id}/images/${imageId}`),
 };
 
 /* ── Enquiries ───────────────────────────────────────────────────────────── */

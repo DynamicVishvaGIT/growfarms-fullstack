@@ -1,10 +1,11 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 import Land_Pakages_1 from "../assets/images/Land_Pakages_1.jpg";
 import Land_Pakages_2 from "../assets/images/Land_Pakages_2.jpg";
 
+import EnquiryModal from "./EnquiryModal";
 import useApiData from "../hooks/useApiData";
 import { getPackages } from "../lib/api";
 import { useProject } from "../context/projectContext";
@@ -50,7 +51,7 @@ const FALLBACK_PACKAGES = [
   },
 ];
 
-function PackageCard({ pkg, index }) {
+function PackageCard({ pkg, index, onBook }) {
   const cardRef = useRef(null);
   const imgRef = useRef(null);
   const btnRef = useRef(null);
@@ -452,6 +453,8 @@ function PackageCard({ pkg, index }) {
         ------------------------------------------------ */}
         <button
           ref={btnRef}
+          type="button"
+          onClick={() => onBook(pkg)}
           onMouseEnter={handleBtnEnter}
           onMouseLeave={handleBtnLeave}
           onMouseMove={handleBtnMove}
@@ -497,6 +500,11 @@ function toCard(pkg, index) {
   return {
     id: pkg.id,
 
+    // The row's own id, kept apart from the card `id` so the fallback cards —
+    // which are numbered 1 and 2 for React's benefit — can never be mistaken
+    // for real packages and file an enquiry against the wrong one.
+    packageId: pkg.id,
+
     title: pkg.title,
 
     description: pkg.description || "",
@@ -524,6 +532,12 @@ export default function LandPackages() {
   const headingRef = useRef(null);
   const eyebrowRef = useRef(null);
   const sectionRef = useRef(null);
+
+  // Which card's "Book Now" was pressed. `open` and `pkg` are tracked apart
+  // because the modal stays mounted so its exit animation can play: closing
+  // clears the flag but keeps the package, or the heading inside would blank
+  // out halfway through the close.
+  const [booking, setBooking] = useState({ open: false, pkg: null });
 
   const project = useProject();
 
@@ -671,9 +685,22 @@ export default function LandPackages() {
             key={pkg.id}
             pkg={pkg}
             index={i}
+            onBook={(chosen) => setBooking({ open: true, pkg: chosen })}
           />
         ))}
       </div>
+
+      {/* ── ENQUIRY MODAL ── */}
+      <EnquiryModal
+        open={booking.open}
+        onClose={() => setBooking((b) => ({ ...b, open: false }))}
+        source="package"
+        property={
+          booking.pkg
+            ? { label: booking.pkg.title, package_id: booking.pkg.packageId }
+            : null
+        }
+      />
     </section>
   );
 }

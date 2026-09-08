@@ -1,15 +1,6 @@
 /**
  * GrowFarms – Core Philosophy Section
  * Stack : React + Tailwind CSS (v3) + GSAP + ScrollTrigger
- *
- * Drop-in usage:
- *   import CorePhilosophy from './CorePhilosophy';
- *   <CorePhilosophy />
- *
- * Dependencies:
- *   npm install gsap
- *   Google Fonts in index.html:
- *   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
  */
 
 import { useEffect, useRef } from 'react';
@@ -24,12 +15,9 @@ gsap.registerPlugin(ScrollTrigger);
 const MissionIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="12" r="4" />
-    <line x1="12" y1="2" x2="12" y2="4" />
-    <line x1="12" y1="20" x2="12" y2="22" />
-    <line x1="2" y1="12" x2="4" y2="12" />
-    <line x1="20" y1="12" x2="22" y2="12" />
+    <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" />
+    <line x1="12" y1="2" x2="12" y2="4" /><line x1="12" y1="20" x2="12" y2="22" />
+    <line x1="2" y1="12" x2="4" y2="12" /><line x1="20" y1="12" x2="22" y2="12" />
   </svg>
 );
 
@@ -51,31 +39,45 @@ const ValuesIcon = () => (
 
 const FALLBACK_CARDS = [
   {
+    icon_key: 'mission',
     Icon: MissionIcon,
     title: 'Mission',
     body: 'To build lasting trust with customers and stakeholders through quality products and services. We drive growth and consistency to maintain a leading market reputation.',
   },
   {
+    icon_key: 'vision',
     Icon: VisionIcon,
     title: 'Vision',
     body: 'Cultivating a future where agricultural investment is accessible, transparent, and environmentally restorative for generations to come.',
   },
   {
+    icon_key: 'values',
     Icon: ValuesIcon,
     title: 'Values',
     body: 'Integrity in every transaction, consistency in our delivery, and an unwavering respect for the land that provides our wealth.',
   },
 ];
 
-/** Icons stay in code so the section keeps its exact hand-drawn glyphs. */
 const ICONS = { mission: MissionIcon, vision: VisionIcon, values: ValuesIcon };
+
+/** Deduplicate API rows — keep only first occurrence of each icon_key */
+function dedupeByKey(rows) {
+  const seen = new Set();
+  return rows.filter((r) => {
+    if (seen.has(r.icon_key)) return false;
+    seen.add(r.icon_key);
+    return true;
+  });
+}
 
 export default function CorePhilosophy() {
   const { data: cards } = useApiData(
     async (signal) => {
       const rows = await getPhilosophyCards(signal);
       if (!rows?.length) return null;
-      return rows.map((r, i) => ({
+
+      const unique = dedupeByKey(rows);          // ← fix duplicate rows
+      return unique.map((r, i) => ({
         Icon: ICONS[r.icon_key] || FALLBACK_CARDS[i % FALLBACK_CARDS.length].Icon,
         title: r.title,
         body: r.body || '',
@@ -91,7 +93,6 @@ export default function CorePhilosophy() {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      /* heading + subtitle fade-down */
       gsap.fromTo(
         [headingRef.current, subtitleRef.current],
         { opacity: 0, y: -36 },
@@ -101,7 +102,6 @@ export default function CorePhilosophy() {
         }
       );
 
-      /* cards staggered fade-up */
       gsap.fromTo(
         cardsRef.current,
         { opacity: 0, y: 60 },
@@ -111,17 +111,14 @@ export default function CorePhilosophy() {
         }
       );
 
-      /* hover lift for each card */
       cardsRef.current.forEach((card) => {
         if (!card) return;
-
         const enter = () =>
           gsap.to(card, { y: -8, scale: 1.02, duration: 0.35, ease: 'power2.out',
             boxShadow: '0 24px 48px rgba(0,0,0,0.13)' });
         const leave = () =>
           gsap.to(card, { y: 0, scale: 1, duration: 0.35, ease: 'power2.out',
             boxShadow: '0 4px 24px rgba(0,0,0,0.06)' });
-
         card.addEventListener('mouseenter', enter);
         card.addEventListener('mouseleave', leave);
       });
@@ -163,13 +160,13 @@ export default function CorePhilosophy() {
           </p>
         </div>
 
-        {/* ── cards grid ── */}
+        {/* ── cards grid — no items-start so rows stretch to equal height ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
           {cards.map(({ Icon, title, body }, i) => (
             <div
               key={title}
               ref={(el) => (cardsRef.current[i] = el)}
-              className="bg-white rounded-2xl p-7 sm:p-[50px] flex h-[350px] flex-col gap-5 cursor-default"
+              className="bg-white rounded-2xl p-7 sm:p-[50px] flex flex-col gap-5 cursor-default overflow-hidden"
               style={{
                 opacity: 0,
                 boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
@@ -182,14 +179,12 @@ export default function CorePhilosophy() {
               </div>
 
               {/* title */}
-              <h3
-                className="text-[#2D5016] text-[1.35rem] sm:text-[1.45rem] font-semibold leading-tight"
-              >
+              <h3 className="text-[#2D5016] text-[1.35rem] sm:text-[1.45rem] font-semibold leading-tight">
                 {title}
               </h3>
 
-              {/* body */}
-              <p className="text-gray-500 text-[0.88rem] sm:text-[0.92rem] leading-relaxed">
+              {/* body — flex-1 pushes it to fill remaining card height */}
+              <p className="text-gray-500 text-[0.88rem] sm:text-[0.92rem] leading-relaxed flex-1">
                 {body}
               </p>
             </div>

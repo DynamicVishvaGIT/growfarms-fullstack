@@ -4,15 +4,6 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import BlogBanner from "../assets/images/Blog_Banner_2.jpeg";
 import logo_img from "../assets/images/grow-farms-logo.png";
 
-import img1 from "../assets/images/Blog_Banner_2.jpeg";
-import img2 from "../assets/images/Blog_Banner_2.jpeg";
-import img3 from "../assets/images/Blog_Banner_2.jpeg";
-import img4 from "../assets/images/Blog_Banner_2.jpeg";
-import img5 from "../assets/images/Blog_Banner_2.jpeg";
-import img6 from "../assets/images/Blog_Banner_2.jpeg";
-import img7 from "../assets/images/Blog_Banner_2.jpeg";
-import img8 from "../assets/images/Blog_Banner_2.jpeg";
-import img9 from "../assets/images/Blog_Banner_2.jpeg";
 import { useNavigate } from "react-router-dom";
 import useApiData from "../hooks/useApiData";
 import { getBlogs } from "../lib/api";
@@ -25,20 +16,11 @@ const PAGE_SIZE = 12;
 // "all of them" actually means here.
 const MAX_LIMIT = 100;
 
-const FALLBACK_POSTS = [
-  { id: 1, img: img1, title: "Better Agriculture for Better Future" },
-  { id: 2, img: img2, title: "A farmer is a person who works in agriculture." },
-  { id: 3, img: img3, title: "A farmer is a person who works in agriculture." },
-  { id: 4, img: img4, title: "A farmer is a person who works in agriculture." },
-  { id: 5, img: img5, title: "A farmer is a person who works in agriculture." },
-  { id: 6, img: img6, title: "A farmer is a person who works in agriculture." },
-  { id: 7, img: img7, title: "A farmer is a person who works in agriculture." },
-  { id: 8, img: img8, title: "A farmer is a person who works in agriculture." },
-  { id: 9, img: img9, title: "A farmer is a person who works in agriculture." },
-];
-
-// The built-in list is all there is to show, so it never offers "View All".
-const FALLBACK_FEED = { items: FALLBACK_POSTS, hasMore: false };
+// Nothing is shown that did not come from the API. Until the request lands
+// this is what renders, and it is also where an empty or unreachable backend
+// leaves the page — the grid then gives way to the "coming soon" panel rather
+// than to invented posts.
+const EMPTY_FEED = { items: [], hasMore: false };
 
 // ── icons ────────────────────────────────────────────────────────────────────
 const CalendarIcon = () => (
@@ -124,12 +106,29 @@ const BlogCard = ({ img, title, category, date, author, slug }) => {
       onClick={() => navigate(slug ? `/blog-details/${slug}` : "/blog-details")}
     >
       <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
-        <img
-          ref={imgRef}
-          src={img}
-          alt={title}
-          className="w-full h-full object-cover will-change-transform"
-        />
+        {img ? (
+          <img
+            ref={imgRef}
+            src={img}
+            alt={title}
+            className="w-full h-full object-cover will-change-transform"
+          />
+        ) : (
+          // A real post that simply has no featured image. Deliberately the
+          // brand mark on a flat tint rather than a stock photograph, so it
+          // never reads as a picture belonging to this article.
+          <div
+            ref={imgRef}
+            className="w-full h-full bg-[#2a4830] flex items-center justify-center will-change-transform"
+          >
+            <img
+              src={logo_img}
+              alt=""
+              aria-hidden="true"
+              className="w-1/2 max-w-[110px] object-contain opacity-20"
+            />
+          </div>
+        )}
 
         <span
           ref={badgeRef}
@@ -164,6 +163,57 @@ const BlogCard = ({ img, title, category, date, author, slug }) => {
   );
 };
 
+// ── empty and loading states ─────────────────────────────────────────────────
+
+/**
+ * Shown while the first request is still in flight, so the page never flashes
+ * "coming soon" at a visitor who is about to be given a grid of posts.
+ */
+const BlogGridSkeleton = () => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-10 max-w-6xl mx-auto">
+    {Array.from({ length: 6 }).map((_, i) => (
+      <div key={i} className="flex flex-col gap-3" aria-hidden="true">
+        <div className="rounded-xl aspect-[4/3] bg-[#EDE7D9]/10 animate-pulse" />
+        <div className="h-2.5 w-1/2 rounded-full bg-[#EDE7D9]/10 animate-pulse" />
+        <div className="h-3 w-4/5 rounded-full bg-[#EDE7D9]/10 animate-pulse" />
+      </div>
+    ))}
+  </div>
+);
+
+/** What stands in for the grid when the CMS holds no published posts. */
+const ComingSoon = () => (
+  <div className="max-w-xl mx-auto px-2 py-16 sm:py-24 text-center">
+    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#EDE7D9]/10">
+      <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden="true">
+        <path
+          d="M4 5.5A1.5 1.5 0 0 1 5.5 4H14l6 6v8.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13Z"
+          fill="none"
+          stroke="#C7DDB5"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path d="M14 4v6h6" fill="none" stroke="#C7DDB5" strokeWidth="1.5" strokeLinejoin="round" />
+        <path
+          d="M8 13.5h8M8 16.5h5"
+          stroke="#C7DDB5"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+
+    <h2 className="mt-7 font-display text-2xl sm:text-3xl font-medium text-[#F4EDE1]">
+      Blogs Coming Soon
+    </h2>
+
+    <p className="mt-3 text-[14px] sm:text-[15px] leading-relaxed text-[#C9C0AC]">
+      We&rsquo;re putting together stories from the farm — on land, growing and
+      the people behind it. Check back shortly.
+    </p>
+  </div>
+);
+
 // ── main component ────────────────────────────────────────────────────────────
 /** The card's date line is upper-case, so format to match the design. */
 function formatCardDate(value) {
@@ -183,17 +233,23 @@ const Blogs = () => {
   // Raised by "View All", which is the only thing that refetches this list.
   const [limit, setLimit] = useState(PAGE_SIZE);
 
-  const { data: feed } = useApiData(
+  const { data: feed, loading } = useApiData(
     async (signal) => {
       const rows = await getBlogs({ limit }, signal);
-      if (!rows?.length) return null;
+
+      // `null` is the client saying it could not reach the API at all, which
+      // is the one case worth holding the previous render for. An empty array
+      // is a real answer — there are no posts — and must be adopted, or the
+      // page would keep showing whatever it had last.
+      if (!rows) return null;
+
       return {
         // A full page back means there is probably another page behind it.
         hasMore: rows.length >= limit && limit < MAX_LIMIT,
         items: rows.map((b) => ({
           id: b.id,
           slug: b.slug,
-          img: b.featured_image_url || FALLBACK_POSTS[0].img,
+          img: b.featured_image_url || null,
           title: b.title,
           category: b.category?.name,
           date: formatCardDate(b.published_at || b.created_at),
@@ -201,11 +257,12 @@ const Blogs = () => {
         })),
       };
     },
-    FALLBACK_FEED,
+    EMPTY_FEED,
     [limit],
   );
 
   const posts = feed.items;
+  const isEmpty = !loading && posts.length === 0;
 
   // Hero entrance
   useEffect(() => {
@@ -348,7 +405,7 @@ const Blogs = () => {
                 transform: heroVisible ? "translateY(0px)" : "translateY(20px)",
               }}
             >
-              Blog
+              Blogs
             </h1>
           </div>
 
@@ -370,23 +427,29 @@ const Blogs = () => {
 
       {/* ── BLOG GRID ────────────────────────────────────────────────────── */}
       <section className="w-full bg-[#315537] px-6 md:px-10 lg:px-16 pt-10 pb-16">
-        <div
-          ref={gridRef}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-10 max-w-6xl mx-auto"
-        >
-          {posts.map((post) => (
-            <div key={post.id} className="blog-card">
-              <BlogCard
-                img={post.img}
-                title={post.title}
-                category={post.category}
-                date={post.date}
-                author={post.author}
-                slug={post.slug}
-              />
-            </div>
-          ))}
-        </div>
+        {loading && <BlogGridSkeleton />}
+
+        {isEmpty && <ComingSoon />}
+
+        {!loading && posts.length > 0 && (
+          <div
+            ref={gridRef}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-10 max-w-6xl mx-auto"
+          >
+            {posts.map((post) => (
+              <div key={post.id} className="blog-card">
+                <BlogCard
+                  img={post.img}
+                  title={post.title}
+                  category={post.category}
+                  date={post.date}
+                  author={post.author}
+                  slug={post.slug}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         {feed.hasMore && (
           <div className="mt-12 flex justify-center">

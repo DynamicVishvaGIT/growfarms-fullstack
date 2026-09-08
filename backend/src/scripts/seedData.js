@@ -485,12 +485,29 @@ const blogTitles = [
   "A farmer is a person who works in agriculture.",
 ];
 
+/* The pair of images the article page shows under the body copy. */
+const blogGallery = [IMG("Blog_Banner_2.jpeg"), IMG("Blog_Banner_2.jpeg")];
+
 const blogs = blogTitles.map((title, i) => ({
   title,
   // Duplicate titles in the source would collide on slug; the seeder's
   // uniqueSlug helper appends -2, -3 … automatically.
-  excerpt:
-    "Explore how modern farmland ownership near Pali combines a peaceful lifestyle with long-term, transparent investment value.",
+  //
+  // The takeaways block — heading, paragraph and ticked list — is seeded on the
+  // first post only, matching the article page the design was drawn from. The
+  // rest leave all three blank, which hides the section.
+  //
+  // The banner wording, the pull-quote and the gallery are seeded on that
+  // first post too. Leaving them blank elsewhere is what the site already
+  // does: the banner then falls back to the Content block, and the quote
+  // card and gallery simply are not drawn.
+  hero_title: i === 0 ? "Blog Details" : "",
+  hero_subtitle: "",
+  sub_heading: i === 0 ? "Everything on our farm is grown" : "",
+  second_description:
+    i === 0
+      ? "They offer adaptability, high nutritional value, and can yield higher yields with minimal agronomic inputs, and provide significant potential for sustainable agriculture and provide nutritional and income security for small and marginal farmers in dry and rainfed semi-arid regions."
+      : "",
   content:
     "<p>Grow Farms brings you verified, plotted agricultural land near Pali, Maharashtra. Every plot is documented, fenced and serviced with water, electricity and road access.</p><p>Our team walks you through site selection, a guided visit, full legal verification and registration — so owning farmland is as straightforward as it should be.</p>",
   featured_image: IMG("Blog_Banner_2.jpeg"),
@@ -502,6 +519,15 @@ const blogs = blogTitles.map((title, i) => ({
   is_featured: i === 0,
   sort_order: i + 1,
   checklist: i === 0 ? blogChecklist : [],
+  quote_text:
+    i === 0
+      ? "When you listen to yourself, everything come naturally. It come from in, like a kind of will to do something. Try to be sensitive. That is just a few clicks away."
+      : "",
+  quote_author: i === 0 ? "Satisfied Client" : "",
+  gallery: i === 0 ? blogGallery : [],
+  // No per-post steps: every article keeps falling back to the shared
+  // scope: "blog" buying steps above until an admin overrides them.
+  steps: [],
 }));
 
 /* ── Website content ─────────────────────────────────────────────────────── */
@@ -565,6 +591,8 @@ const websiteContent = [
     section_key: "trust_section",
     label: "15 Years of Cultivating Trust",
     title: "15 Years of Cultivating Trust",
+    // The gold pill above the heading.
+    subtitle: "Our Legacy",
     body:
       "Grow Farms has a strong foothold in the market, with 15 years of experience. We guarantee reliable delivery of agricultural land, merging the grit of traditional farming with the precision of modern financial management.",
     image: IMG("trust_img.jpg"),
@@ -576,6 +604,8 @@ const websiteContent = [
       ],
       quote:
         "Our commitment extends beyond transactions; we prioritize environmental and health considerations in every acre we manage.",
+      // The white card floating over the photograph.
+      card_title: "Certified Stability",
       card_text: "We understand your dream of a second home surrounded by nature.",
     },
     sort_order: 2,
@@ -637,6 +667,25 @@ const websiteContent = [
     sort_order: 6,
   },
 
+  /* Blogs — the two page-wide labels on BlogDetails.jsx */
+  {
+    page: "blogs",
+    section_key: "detail_hero",
+    label: "Article hero",
+    // What sits over the banner when a post names no hero wording of its own.
+    // Blank here too and the banner falls through to the post's title.
+    title: "Blog Details",
+    link_label: "All blogs",
+    sort_order: 1,
+  },
+  {
+    page: "blogs",
+    section_key: "detail_related",
+    label: "Other Blog heading",
+    title: "Other Blog",
+    sort_order: 2,
+  },
+
   /* Contact — Contact.jsx infoCards + map */
   {
     page: "contact",
@@ -650,23 +699,28 @@ const websiteContent = [
     page: "contact",
     section_key: "info_cards",
     label: "Contact info cards",
-    // Placeholder values still live on the site — edit in Admin → Settings.
+    // Placeholder values still live on the site — edit in Admin → Contact Page.
+    // `link` is what the card's arrow bubble opens; left blank the site derives
+    // one from the card's own lines (mailto:, tel:) or the map link setting.
     extra_data: {
       cards: [
         {
           icon: "mail",
           title: "Mail us 24/7",
           lines: ["pbminfo@admin.com", "pbmadmin@info.com"],
+          link: "",
         },
         {
           icon: "phone",
           title: "Call us 24/7",
           lines: ["Phone : (+55) 654 - 545 - 5418", "Mobile : (+01) 654 - 545 - 1235"],
+          link: "",
         },
         {
           icon: "map",
           title: "Our Locations",
           lines: ["4821 Ride Top, Anch St, Alaska", "997998, USA main city."],
+          link: "",
         },
       ],
     },
@@ -761,6 +815,14 @@ const settings = [
     group: "contact",
     type: "url",
     sort_order: 6,
+  },
+  {
+    key: "google_map_link",
+    value: "https://www.google.com/maps?q=Mumbai,Maharashtra,India",
+    label: "Google Maps link (opens in a new tab)",
+    group: "contact",
+    type: "url",
+    sort_order: 7,
   },
 
   { key: "meta_title", value: "Grow Farm", label: "Default meta title", group: "seo", sort_order: 1 },

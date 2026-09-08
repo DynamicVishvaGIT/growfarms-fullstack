@@ -111,22 +111,42 @@ function sharedGet(key, loader) {
   if (!shared.has(key)) {
     shared.set(
       key,
-      // A failure must not be cached forever, or a backend that comes up later
-      // would never be picked up on a client-side navigation.
-      loader().catch((err) => {
-        shared.delete(key);
-        throw err;
-      }),
+      loader()
+        // `safeGet` reports every failure — including an abort — as `null`
+        // rather than throwing, so a failed read would otherwise sit in this
+        // map as a permanent "there is no content". Evicting it means the next
+        // component to ask tries again, which is what lets a backend that
+        // comes up late still be picked up.
+        .then((value) => {
+          if (value === null || value === undefined) shared.delete(key);
+          return value;
+        })
+        .catch((err) => {
+          shared.delete(key);
+          throw err;
+        }),
     );
   }
   return shared.get(key);
 }
 
-export const getContent = (page, signal) =>
-  sharedGet(`content:${page}`, () => safeGet("/content", { page, grouped: "true" }, signal));
+/*
+ * Note both of these deliberately ignore the caller's abort signal.
+ *
+ * One request is shared by every component that asks for the page, so honouring
+ * one caller's unmount would cancel it for all of them. React's StrictMode
+ * mounts each effect twice in development — mount, clean up, mount again — so
+ * passing the signal through meant the first mount's cleanup aborted the only
+ * request that was ever made, and every consumer silently fell back to its
+ * built-in content. The same thing happened in production whenever a visitor
+ * navigated away while the request was still in flight.
+ *
+ * Nothing is left hanging: `request` applies its own TIMEOUT_MS to each call.
+ */
+export const getContent = (page) =>
+  sharedGet(`content:${page}`, () => safeGet("/content", { page, grouped: "true" }));
 
-export const getSettings = (signal) =>
-  sharedGet("settings", () => safeGet("/settings", { flat: "true" }, signal));
+export const getSettings = () => sharedGet("settings", () => safeGet("/settings", { flat: "true" }));
 
 /** Read one content block out of a grouped response. */
 export function contentBlock(grouped, page, key) {

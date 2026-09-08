@@ -210,7 +210,7 @@ async function seedBlogs(categoryMap) {
   console.log("\n[seed] blogs");
 
   for (const b of data.blogs) {
-    const { category_slug: catSlug, checklist, ...rest } = b;
+    const { category_slug: catSlug, checklist, gallery, steps, ...rest } = b;
 
     // Several source posts share a title, so the slug is made unique here.
     const slug = await uniqueSlug(db.Blog, b.title);
@@ -231,6 +231,23 @@ async function seedBlogs(categoryMap) {
     if (checklist && checklist.length) {
       await db.BlogChecklist.bulkCreate(
         checklist.map((item_text, i) => ({ blog_id: row.id, item_text, sort_order: i })),
+      );
+    }
+
+    if (gallery && gallery.length) {
+      await db.BlogImage.bulkCreate(
+        gallery.map((image_path, i) => ({
+          blog_id: row.id,
+          image_path,
+          alt_text: b.title,
+          sort_order: i,
+        })),
+      );
+    }
+
+    if (steps && steps.length) {
+      await db.BlogStep.bulkCreate(
+        steps.map((st, i) => ({ blog_id: row.id, sort_order: i, ...st })),
       );
     }
   }
@@ -257,7 +274,7 @@ async function wipe() {
     db.PackageTag, db.PackageImage, db.Package,
     db.ProjectImage, db.ProjectAmenity,
     db.Facility, db.TravelRoute, db.WhyChooseCard, db.Faq,
-    db.BlogChecklist, db.Blog,
+    db.BlogChecklist, db.BlogImage, db.BlogStep, db.BlogRelated, db.Blog,
     db.BuyingStep, db.WhyPaliSlide, db.PhilosophyCard, db.Testimonial, db.SocialLink,
     db.Amenity, db.WebsiteContent, db.Setting,
     db.Project, db.Category,

@@ -15,6 +15,23 @@ module.exports = (sequelize) => {
       },
       excerpt: { type: DataTypes.STRING(500), allowNull: true },
       content: { type: DataTypes.TEXT("long"), allowNull: true },
+
+      // Wording laid over the full-bleed banner. Blank falls back to the
+      // "Blog article hero" block in Admin → Content → Blogs, and past that to
+      // the post's own title.
+      hero_title: { type: DataTypes.STRING(240), allowNull: true },
+      hero_subtitle: { type: DataTypes.STRING(400), allowNull: true },
+
+      // The block above the ticked list on the article page: its own heading
+      // and paragraph. Blank on a post means that section shows just the list,
+      // under the wording the page ships with.
+      sub_heading: { type: DataTypes.STRING(240), allowNull: true },
+      second_description: { type: DataTypes.TEXT, allowNull: true },
+
+      // The white pull-quote card that straddles the foot of the article.
+      // Without quote_text the card is not rendered at all.
+      quote_text: { type: DataTypes.TEXT, allowNull: true },
+      quote_author: { type: DataTypes.STRING(160), allowNull: true },
       featured_image: { type: DataTypes.STRING(255), allowNull: true },
       banner_image: { type: DataTypes.STRING(255), allowNull: true },
       category_id: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },

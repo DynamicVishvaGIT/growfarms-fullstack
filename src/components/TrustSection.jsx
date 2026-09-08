@@ -3,9 +3,64 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import trustedImg from "../assets/images/trust_img.jpg";
 
+import useApiData from "../hooks/useApiData";
+import { getContent, contentBlock } from "../lib/api";
+
 gsap.registerPlugin(ScrollTrigger);
 
+/**
+ * The section as it was designed. Every field is editable in
+ * Admin -> About Page, and each one falls back here on its own, so clearing a
+ * single field in the CMS restores that piece rather than blanking the block.
+ */
+const FALLBACK = {
+  eyebrow: "Our Legacy",
+  heading: "15 Years of Cultivating Trust",
+  body:
+    "Grow Farms has a strong foothold in the market, with 15 years of experience. " +
+    "We guarantee reliable delivery of agricultural land, merging the grit of " +
+    "traditional farming with the precision of modern financial management.",
+  image: trustedImg,
+  stats: [
+    { value: 15, suffix: "+", label: "Years Experience" },
+    { value: 7, suffix: "-8", label: "Avg. Team Tenure" },
+  ],
+  quote:
+    "Our commitment extends beyond transactions; we prioritize environmental and " +
+    "health considerations in every acre we manage.",
+  cardTitle: "Certified Stability",
+  cardText: "We understand your dream of a second home surrounded by nature.",
+};
+
+const trimmed = (value, fallback) => (String(value || "").trim() || fallback);
+
 export default function TrustSection() {
+  const { data: content } = useApiData(
+    async (signal) => {
+      const grouped = await getContent("about", signal);
+      const block = contentBlock(grouped, "about", "trust_section");
+      if (!block) return null;
+
+      const extra = block.extra_data || {};
+      const stats = Array.isArray(extra.stats)
+        ? extra.stats.filter((st) => st && (st.value !== undefined || st.label))
+        : [];
+
+      return {
+        eyebrow: trimmed(block.subtitle, FALLBACK.eyebrow),
+        heading: trimmed(block.title, FALLBACK.heading),
+        body: trimmed(block.body, FALLBACK.body),
+        image: block.image_url || FALLBACK.image,
+        stats: stats.length ? stats : FALLBACK.stats,
+        quote: trimmed(extra.quote, FALLBACK.quote),
+        cardTitle: trimmed(extra.card_title, FALLBACK.cardTitle),
+        cardText: trimmed(extra.card_text, FALLBACK.cardText),
+      };
+    },
+    FALLBACK,
+    [],
+  );
+
   const sectionRef = useRef(null);
   const eyebrowRef = useRef(null);
   const headingRef = useRef(null);
@@ -17,8 +72,8 @@ export default function TrustSection() {
   const mainImgRef = useRef(null);
   const cardRef = useRef(null);
 
-  const stat1Ref = useRef(null);
-  const stat2Ref = useRef(null);
+  // One ref per stat, since how many there are is now the admin's choice.
+  const statRefs = useRef([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -124,8 +179,14 @@ export default function TrustSection() {
         });
       };
 
-      countUp(stat1Ref.current, 15, "+");
-      countUp(stat2Ref.current, 7, "-8");
+      // A stat whose value is not a number (say "15+" typed into the value
+      // box) is left exactly as rendered rather than counted to NaN.
+      content.stats.forEach((stat, i) => {
+        const el = statRefs.current[i];
+        if (!el) return;
+        const target = Number(stat.value);
+        if (Number.isFinite(target)) countUp(el, target, stat.suffix || "");
+      });
 
       // -----------------------------
       // IMAGE PARALLAX
@@ -144,7 +205,10 @@ export default function TrustSection() {
     }, sectionRef);
 
     return () => ctx.revert();
-  }, []);
+    // Re-run when the CMS copy lands: the counters animate to the saved
+    // numbers, and any element rendered after the first pass still gets its
+    // entrance rather than keeping the opacity: 0 it was rendered with.
+  }, [content]);
 
   return (
     <section
@@ -267,7 +331,7 @@ export default function TrustSection() {
                   whitespace-nowrap
                 "
               >
-                Our Legacy
+                {content.eyebrow}
               </span>
             </div>
 
@@ -297,7 +361,7 @@ export default function TrustSection() {
                 opacity: 0,
               }}
             >
-              15 Years of Cultivating Trust
+              {content.heading}
             </h2>
 
             {/* BODY */}
@@ -318,10 +382,7 @@ export default function TrustSection() {
               "
               style={{ opacity: 0 }}
             >
-              Grow Farms has a strong foothold in the market, with 15 years
-              of experience. We guarantee reliable delivery of agricultural
-              land, merging the grit of traditional farming with the
-              precision of modern financial management.
+              {content.body}
             </p>
 
             {/* ==================================================
@@ -343,100 +404,63 @@ export default function TrustSection() {
               "
               style={{ opacity: 0 }}
             >
-              {/* STAT 1 */}
-              <div className="min-w-0">
-                <p
-                  ref={stat1Ref}
-                  className="
-                    text-[2rem]
-                    leading-none
+              {content.stats.map((stat, i) => (
+                <div key={i} className="contents">
+                  {i > 0 && (
+                    /* DIVIDER */
+                    <div className="w-px bg-white/10 self-stretch" />
+                  )}
 
-                    sm:text-[2.35rem]
+                  <div className="min-w-0">
+                    <p
+                      ref={(el) => {
+                        statRefs.current[i] = el;
+                      }}
+                      className="
+                        text-[2rem]
+                        leading-none
 
-                    md:text-[2.6rem]
+                        sm:text-[2.35rem]
 
-                    font-bold
-                    text-white
-                  "
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                  }}
-                >
-                  0+
-                </p>
+                        md:text-[2.6rem]
 
-                <p
-                  className="
-                    mt-2
+                        font-bold
+                        text-white
+                      "
+                      style={{
+                        fontFamily: "'Playfair Display', Georgia, serif",
+                      }}
+                    >
+                      {/* The finished figure, not a zero: if the count-up
+                          never runs the right number is already on screen. */}
+                      {`${stat.value ?? ""}${stat.suffix || ""}`}
+                    </p>
 
-                    text-[9px]
-                    leading-tight
+                    <p
+                      className="
+                        mt-2
 
-                    sm:text-[10px]
+                        text-[9px]
+                        leading-tight
 
-                    md:text-[11px]
+                        sm:text-[10px]
 
-                    tracking-[0.08em]
-                    uppercase
+                        md:text-[11px]
 
-                    text-white/50
-                    font-medium
+                        tracking-[0.08em]
+                        uppercase
 
-                    whitespace-nowrap
-                  "
-                >
-                  Years Experience
-                </p>
-              </div>
+                        text-white/50
+                        font-medium
 
-              {/* DIVIDER */}
-              <div className="w-px bg-white/10 self-stretch" />
-
-              {/* STAT 2 */}
-              <div className="min-w-0">
-                <p
-                  ref={stat2Ref}
-                  className="
-                    text-[2rem]
-                    leading-none
-
-                    sm:text-[2.35rem]
-
-                    md:text-[2.6rem]
-
-                    font-bold
-                    text-white
-                  "
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                  }}
-                >
-                  0-8
-                </p>
-
-                <p
-                  className="
-                    mt-2
-
-                    text-[9px]
-                    leading-tight
-
-                    sm:text-[10px]
-
-                    md:text-[11px]
-
-                    tracking-[0.08em]
-                    uppercase
-
-                    text-white/50
-                    font-medium
-
-                    whitespace-nowrap
-                  "
-                >
-                  Avg. Team Tenure
-                </p>
-              </div>
+                        whitespace-nowrap
+                      "
+                    >
+                      {stat.label}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* ==================================================
@@ -473,9 +497,7 @@ export default function TrustSection() {
                   italic
                 "
               >
-                "Our commitment extends beyond transactions; we prioritize
-                environmental and health considerations in every acre we
-                manage."
+                &ldquo;{content.quote}&rdquo;
               </p>
             </div>
           </div>
@@ -521,8 +543,11 @@ export default function TrustSection() {
                 }}
               >
                 <img
-                  src={trustedImg}
-                  alt="Two farmers shaking hands in a field"
+                  src={content.image}
+                  alt={content.heading}
+                  onError={(e) => {
+                    e.currentTarget.src = trustedImg;
+                  }}
                   className="
                     block
                     w-full
@@ -646,7 +671,7 @@ export default function TrustSection() {
                   fontFamily: "'Playfair Display', Georgia, serif",
                 }}
               >
-                Certified Stability
+                {content.cardTitle}
               </h4>
 
               {/* CARD TEXT */}
@@ -661,8 +686,7 @@ export default function TrustSection() {
                   leading-[1.55]
                 "
               >
-                We understand your dream of a second home surrounded by
-                nature.
+                {content.cardText}
               </p>
             </div>
           </div>

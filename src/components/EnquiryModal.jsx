@@ -54,7 +54,17 @@ function Field({ as: Tag = "input", rowRef, error, name, ...props }) {
   );
 }
 
-export default function EnquiryModal({ open, onClose, property }) {
+/**
+ * `property` is whatever the modal was opened from — a map pin, or one of the
+ * land packages. A pin carries a slug or id; a package carries `package_id`,
+ * which is what lets the enquiry be filed against it in Admin.
+ */
+export default function EnquiryModal({
+  open,
+  onClose,
+  property,
+  source = "enquiry_modal",
+}) {
   const navigate = useNavigate();
 
   const [form, setForm] = useState(EMPTY_FORM);
@@ -214,13 +224,13 @@ export default function EnquiryModal({ open, onClose, property }) {
     setSending(true);
     try {
       await submitEnquiry({
-        source: "enquiry_modal",
+        source,
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
         message: form.message.trim() || undefined,
-        // `property` is the map pin this modal was opened from.
         project_slug: property?.slug || property?.id || undefined,
+        package_id: property?.package_id || undefined,
         subject: property?.label || property?.title || undefined,
       });
       // The visitor is confirmed on the Thank You page rather than in place, so
@@ -229,7 +239,7 @@ export default function EnquiryModal({ open, onClose, property }) {
       navigate("/thank-you", {
         replace: true,
         state: {
-          source: "enquiry_modal",
+          source,
           name: form.name.trim(),
           subject: property?.label || property?.title || undefined,
         },

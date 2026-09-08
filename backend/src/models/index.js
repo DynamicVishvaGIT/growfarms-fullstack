@@ -29,6 +29,9 @@ const SocialLink = require("./SocialLink")(sequelize);
 
 const Blog = require("./Blog")(sequelize);
 const BlogChecklist = require("./BlogChecklist")(sequelize);
+const BlogImage = require("./BlogImage")(sequelize);
+const BlogStep = require("./BlogStep")(sequelize);
+const BlogRelated = require("./BlogRelated")(sequelize);
 
 const Enquiry = require("./Enquiry")(sequelize);
 const WebsiteContent = require("./WebsiteContent")(sequelize);
@@ -104,9 +107,27 @@ Project.hasMany(Testimonial, {
 });
 Testimonial.belongsTo(Project, { foreignKey: "project_id", as: "project" });
 
-// Blog
+// Blog. Every part of the article page hangs off the post itself, so all
+// three cascade — a checklist, gallery or step list has no life of its own.
 Blog.hasMany(BlogChecklist, { foreignKey: "blog_id", as: "checklist", onDelete: "CASCADE" });
 BlogChecklist.belongsTo(Blog, { foreignKey: "blog_id", as: "blog" });
+
+Blog.hasMany(BlogImage, { foreignKey: "blog_id", as: "images", onDelete: "CASCADE" });
+BlogImage.belongsTo(Blog, { foreignKey: "blog_id", as: "blog" });
+
+Blog.hasMany(BlogStep, { foreignKey: "blog_id", as: "steps", onDelete: "CASCADE" });
+BlogStep.belongsTo(Blog, { foreignKey: "blog_id", as: "blog" });
+
+// "Other Blog" — blogs pointing at blogs, so both sides are the same model.
+// Unpicking happens automatically at either end: deleting a post drops the
+// rows that name it as well as the rows it owns.
+Blog.belongsToMany(Blog, {
+  through: BlogRelated,
+  foreignKey: "blog_id",
+  otherKey: "related_blog_id",
+  as: "relatedPosts",
+  onDelete: "CASCADE",
+});
 
 // Enquiries keep their link but survive the project being removed — a lead is
 // a business record and must never disappear because a listing was archived.
@@ -142,6 +163,9 @@ const db = {
   SocialLink,
   Blog,
   BlogChecklist,
+  BlogImage,
+  BlogStep,
+  BlogRelated,
   Enquiry,
   WebsiteContent,
   Setting,

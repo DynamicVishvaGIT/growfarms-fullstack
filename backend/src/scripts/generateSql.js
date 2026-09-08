@@ -45,6 +45,9 @@ const ORDER = [
   "SocialLink",
   "Blog",
   "BlogChecklist",
+  "BlogImage",
+  "BlogStep",
+  "BlogRelated",
   "Enquiry",
   "WebsiteContent",
   "Setting",
@@ -391,12 +394,14 @@ function buildSeed() {
   );
 
   const blogChecklists = [];
+  const blogImages = [];
+  const blogSteps = [];
   lines.push("-- ── blogs ──");
   lines.push(
     insert(
       "blogs",
       data.blogs.map((b, i) => {
-        const { category_slug, checklist, ...rest } = b;
+        const { category_slug, checklist, gallery, steps, ...rest } = b;
         (checklist || []).forEach((item, ci) =>
           blogChecklists.push(
             stamp({
@@ -405,6 +410,22 @@ function buildSeed() {
               item_text: item,
               sort_order: ci,
             }),
+          ),
+        );
+        (gallery || []).forEach((image_path, gi) =>
+          blogImages.push(
+            stamp({
+              id: blogImages.length + 1,
+              blog_id: i + 1,
+              image_path,
+              alt_text: b.title,
+              sort_order: gi,
+            }),
+          ),
+        );
+        (steps || []).forEach((st, si) =>
+          blogSteps.push(
+            stamp({ id: blogSteps.length + 1, blog_id: i + 1, sort_order: si, ...st }),
           ),
         );
         return stamp({
@@ -421,6 +442,12 @@ function buildSeed() {
 
   lines.push("-- ── blog_checklist ──");
   lines.push(insert("blog_checklist", blogChecklists));
+
+  lines.push("-- ── blog_images ──");
+  lines.push(insert("blog_images", blogImages));
+
+  lines.push("-- ── blog_steps ──");
+  lines.push(insert("blog_steps", blogSteps));
 
   lines.push("-- ── website_content ──");
   lines.push(

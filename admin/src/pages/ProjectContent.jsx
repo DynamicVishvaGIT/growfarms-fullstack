@@ -38,6 +38,9 @@ const BLANK_PROSE = {
   about_eyebrow: "",
   about_title: "",
   about_body: "",
+  why_choose_eyebrow: "",
+  why_choose_title: "",
+  why_choose_body: "",
   invest_title: "",
   invest_body: "",
 };
@@ -288,9 +291,67 @@ export default function ProjectContent() {
           {loading ? (
             <Loading label="Loading project…" />
           ) : active.cms ? (
-            // Locked to this project: the list hides its own project picker and
-            // creates every new row against this project.
-            <CmsList key={`${active.key}-${projectId}`} resource={active.key} projectId={projectId} embedded />
+            <>
+              {/* The three cards are rows of their own; the block that
+                  introduces them is columns on the project, so this tab
+                  carries both. */}
+              {active.key === "why-choose-cards" && (
+                <div className="card" style={{ marginBottom: 18 }}>
+                  <div className="card-head">
+                    <h2>Section heading</h2>
+                  </div>
+                  <div className="card-body">
+                    <p style={{ margin: "0 0 16px", color: "var(--ink-3)", fontSize: 13 }}>
+                      The label, headline and paragraph above the three cards. Each field left
+                      blank keeps the wording the site ships with, so filling in only the
+                      headline is a perfectly good edit.
+                    </p>
+
+                    <div className="form-grid">
+                      <Field
+                        label="Small label"
+                        name="why_choose_eyebrow"
+                        value={prose.why_choose_eyebrow}
+                        onChange={changeProse}
+                        placeholder="The Advantage"
+                        maxLength={80}
+                        hint="The gold line above the headline."
+                      />
+                      <Field
+                        label="Headline"
+                        name="why_choose_title"
+                        value={prose.why_choose_title}
+                        onChange={changeProse}
+                        placeholder={`Why Choose ${project?.title || "this project"}?`}
+                        maxLength={200}
+                        hint="Names the project by default — change it here to say something else."
+                      />
+                      <Field
+                        label="Paragraph"
+                        name="why_choose_body"
+                        as="textarea"
+                        rows={6}
+                        className="span-2"
+                        value={prose.why_choose_body}
+                        onChange={changeProse}
+                        hint="The centred paragraph under the headline."
+                      />
+                    </div>
+
+                    <SaveBar onSave={saveProse} saving={saving} label="Save heading" />
+                  </div>
+                </div>
+              )}
+
+              {/* Locked to this project: the list hides its own project picker
+                  and creates every new row against this project. */}
+              <CmsList
+                key={`${active.key}-${projectId}`}
+                resource={active.key}
+                projectId={projectId}
+                embedded
+              />
+            </>
           ) : tab === "banner" ? (
             <div className="card">
               <div className="card-head">

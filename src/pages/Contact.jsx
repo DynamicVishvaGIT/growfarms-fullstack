@@ -5,7 +5,7 @@ import logo_img from "../assets/images/grow-farms-logo.png";
 import CardVector from "../assets/images/Vector__4_.png";
 import contectSideimg from "../assets/images/Contact.jpg";
 
-import { Mail, Phone, MapPin, ArrowUpRight } from "lucide-react";
+import { Mail, Phone, MapPin, Clock, MessageCircle, ArrowUpRight } from "lucide-react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
@@ -70,29 +70,43 @@ function Field({ as: Tag = "input", error, name, className = "", ...props }) {
   );
 }
 
+/** Icon components keyed by the name stored against each contact card. */
+const CARD_ICONS = {
+  mail: Mail,
+  phone: Phone,
+  map: MapPin,
+  clock: Clock,
+  message: MessageCircle,
+};
+
 const FALLBACK_INFO_CARDS = [
   {
-    icon: Mail,
+    icon: "mail",
+    Icon: Mail,
     title: "Mail us 24/7",
     lines: ["pbminfo@admin.com", "pbmadmin@info.com"],
+    href: "mailto:pbminfo@admin.com",
   },
   {
-    icon: Phone,
+    icon: "phone",
+    Icon: Phone,
     title: "Call us 24/7",
     lines: [
       "Phone : (+55) 654 - 545 - 5418",
       "Mobile : (+01) 654 - 545 - 1235",
     ],
+    href: "tel:+556545455418",
   },
   {
-    icon: MapPin,
+    icon: "map",
+    Icon: MapPin,
     title: "Our Locations",
     lines: ["4821 Ride Top, Anch St, Alaska", "997998, USA main city."],
+    // Kept in step with the other two so the design's third bubble is still
+    // there when the backend is unreachable.
+    href: "https://www.google.com/maps/search/?api=1&query=4821%20Ride%20Top%2C%20Anch%20St%2C%20Alaska",
   },
 ];
-
-/** Icon components keyed by the name stored against each contact card. */
-const CARD_ICONS = { mail: Mail, phone: Phone, map: MapPin };
 
 /**
  * The location card is designed as two lines. Split a stored one-line address
@@ -105,15 +119,70 @@ function splitAddress(address) {
   return [parts.slice(0, mid).join(", "), parts.slice(mid).join(", ")];
 }
 
-const FALLBACK_MAP_EMBED =
-  "https://www.google.com/maps?q=Mumbai,Maharashtra,India&output=embed";
+/**
+ * A card the admin left with no lines of its own borrows them from
+ * Settings → Contact details, which is the same pair the footer shows.
+ */
+function linesFromSettings(icon, settings) {
+  if (!settings) return [];
+  if (icon === "mail") {
+    return [settings.contact_email_1, settings.contact_email_2].filter(Boolean);
+  }
+  if (icon === "phone") {
+    return [settings.contact_phone_1, settings.contact_phone_2].filter(Boolean);
+  }
+  if (icon === "map" && settings.contact_address) {
+    return splitAddress(settings.contact_address);
+  }
+  return [];
+}
+
+const EMAIL_IN_TEXT = /[\w.+-]+@[\w-]+\.[\w.-]+/;
+const PHONE_IN_TEXT = /\+?\d[\d\s().-]{6,}/;
+
+/**
+ * Where a card's arrow bubble goes. An explicit link from the admin wins;
+ * otherwise a mail card opens its first address, a phone card dials its first
+ * number, and an address card opens the map — the saved map link if there is
+ * one, else a Maps search for the address itself.
+ */
+function cardHref(card, settings) {
+  if (card.link) return card.link.trim();
+
+  const first = card.lines[0] || "";
+
+  if (card.icon === "mail") {
+    const match = first.match(EMAIL_IN_TEXT);
+    return match ? `mailto:${match[0]}` : "";
+  }
+
+  if (card.icon === "phone") {
+    const match = first.match(PHONE_IN_TEXT);
+    return match ? `tel:${match[0].replace(/[^\d+]/g, "")}` : "";
+  }
+
+  if (card.icon === "map") {
+    if (settings?.google_map_link) return settings.google_map_link;
+    const address = settings?.contact_address || card.lines.join(", ");
+    return address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+      : "";
+  }
+
+  return "";
+}
+
+const FALLBACK_MAP = {
+  embed: "https://www.google.com/maps?q=Mumbai,Maharashtra,India&output=embed",
+  link: "",
+};
 
 const Contact = () => {
   /* ---------- Page-wide ref (scopes the GSAP context) ---------- */
   const pageRef = useRef(null);
 
-  // Contact details live in Settings; the three-card layout itself comes from
-  // the contact page's content block, so both stay editable.
+  // Admin -> Contact Page owns the cards; Settings -> Contact details fills in
+  // any card whose lines were left blank, which is what the footer reads too.
   const { data: infoCards } = useApiData(async (signal) => {
     const [settings, grouped] = await Promise.all([
       getSettings(signal),
@@ -123,49 +192,40 @@ const Contact = () => {
 
     const stored = contentBlock(grouped, "contact", "info_cards")?.extra_data?.cards;
 
-    if (settings) {
-      const emails = [settings.contact_email_1, settings.contact_email_2].filter(Boolean);
-      const phones = [settings.contact_phone_1, settings.contact_phone_2].filter(Boolean);
-      const address = settings.contact_address;
+    // With no saved cards the page still shows the designed three, filled from
+    // Settings — the same arrangement the site shipped with.
+    const source = stored?.length
+      ? stored
+      : FALLBACK_INFO_CARDS.map((c) => ({ icon: c.icon, title: c.title, lines: [], link: "" }));
 
-      if (emails.length || phones.length || address) {
-        return [
-          {
-            icon: Mail,
-            title: stored?.[0]?.title || "Mail us 24/7",
-            lines: emails.length ? emails : FALLBACK_INFO_CARDS[0].lines,
-          },
-          {
-            icon: Phone,
-            title: stored?.[1]?.title || "Call us 24/7",
-            lines: phones.length ? phones : FALLBACK_INFO_CARDS[1].lines,
-          },
-          {
-            icon: MapPin,
-            title: stored?.[2]?.title || "Our Locations",
-            // The footer renders the address as one line; the card splits it
-            // across two the way the design does.
-            lines: address ? splitAddress(address) : FALLBACK_INFO_CARDS[2].lines,
-          },
-        ];
-      }
-    }
+    const cards = source
+      .map((card, i) => {
+        const icon = card.icon || FALLBACK_INFO_CARDS[i]?.icon || "mail";
+        const lines = card.lines?.length ? card.lines : linesFromSettings(icon, settings);
+        const resolved = { ...card, icon, lines };
+        return {
+          icon,
+          Icon: CARD_ICONS[icon] || Mail,
+          title: card.title || FALLBACK_INFO_CARDS[i]?.title || "",
+          lines: lines.length ? lines : FALLBACK_INFO_CARDS[i]?.lines || [],
+          href: cardHref(resolved, settings),
+        };
+      })
+      // A card with neither a heading nor a line would render as an empty
+      // shape, so drop it rather than leave a gap in the row.
+      .filter((c) => c.title || c.lines.length);
 
-    if (stored?.length) {
-      return stored.map((c, i) => ({
-        icon: CARD_ICONS[c.icon] || FALLBACK_INFO_CARDS[i]?.icon || Mail,
-        title: c.title,
-        lines: c.lines || [],
-      }));
-    }
-
-    return null;
+    return cards.length ? cards : null;
   }, FALLBACK_INFO_CARDS);
 
-  const { data: mapEmbed } = useApiData(async (signal) => {
+  const { data: mapSettings } = useApiData(async (signal) => {
     const settings = await getSettings(signal);
-    return settings?.google_map_embed || null;
-  }, FALLBACK_MAP_EMBED);
+    if (!settings) return null;
+    return {
+      embed: settings.google_map_embed || FALLBACK_MAP.embed,
+      link: settings.google_map_link || "",
+    };
+  }, FALLBACK_MAP);
 
   /* ---------- Section-level refs — same granularity as About.jsx ---------- */
   const cardsWrapRef = useRef(null); // whole info-cards grid, one block
@@ -473,33 +533,42 @@ const Contact = () => {
             ref={cardsWrapRef}
             className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
           >
-            {infoCards.map(({ icon: Icon, title, lines }) => (
+            {infoCards.map(({ Icon, title, lines, href }, i) => (
               <div
-                key={title}
+                key={`${title}-${i}`}
                 ref={addCardRef}
-                className="relative px-6 py-10 shadow-sm sm:px-7"
+                // The vector shape stretches to whatever the card ends up
+                // being, so the text below only has to wrap rather than fit:
+                // `min-w-0` lets it, and the padding keeps it clear of the
+                // arrow bubble in the cut-out corner.
+                className="relative flex min-w-0 flex-col px-6 pb-12 pt-10 shadow-sm sm:px-7"
               >
                 <img
                   src={CardVector}
-                  alt="cardVector"
+                  alt=""
+                  aria-hidden="true"
                   className="absolute inset-0 h-full w-full"
                 />
 
-                <div className="relative z-10">
-                  <div className="flex items-center gap-4">
+                <div className="relative z-10 min-w-0">
+                  <div className="flex min-w-0 items-center gap-4">
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1e3a2b]">
                       <Icon className="h-5 w-5 text-white" strokeWidth={1.75} />
                     </span>
-                    <h3 className="text-lg font-semibold text-[#16281c] sm:text-xl">
+                    <h3 className="min-w-0 hyphens-auto break-words text-lg font-semibold text-[#16281c] sm:text-xl">
                       {title}
                     </h3>
                   </div>
 
-                  <div className="mt-5 border-t border-gray-100 pt-5">
-                    {lines.map((line) => (
+                  <div className="mt-5 min-w-0 border-t border-gray-100 pr-10 pt-5 sm:pr-12">
+                    {lines.map((line, lineIndex) => (
                       <p
-                        key={line}
-                        className="text-[13px] leading-6 text-gray-500 sm:text-sm"
+                        key={`${line}-${lineIndex}`}
+                        // An address or a long address line has to break
+                        // inside the word if that is what it takes — spilling
+                        // outside the card shape is the one thing it must not
+                        // do.
+                        className="break-words [overflow-wrap:anywhere] text-[13px] leading-6 text-gray-500 sm:text-sm"
                       >
                         {line}
                       </p>
@@ -507,24 +576,30 @@ const Contact = () => {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  aria-label={`${title} - open`}
-                  onMouseEnter={handleBubbleEnter}
-                  onMouseLeave={handleBubbleLeave}
-                  className="
-                    arrow-bubble absolute
-                    -bottom-2 right-6
-                    z-20 flex h-11 w-11
-                    items-center justify-center
-                    rounded-full bg-white
-                    text-[#1e3a2b]
-                    shadow-md ring-1 ring-black/5
-                    sm:right-0
-                  "
-                >
-                  <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
-                </button>
+                {href && (
+                  <a
+                    href={href}
+                    // Only an off-site map link leaves the tab; mailto: and
+                    // tel: hand off to the visitor's own apps.
+                    target={/^https?:/i.test(href) ? "_blank" : undefined}
+                    rel={/^https?:/i.test(href) ? "noreferrer" : undefined}
+                    aria-label={`${title} - open`}
+                    onMouseEnter={handleBubbleEnter}
+                    onMouseLeave={handleBubbleLeave}
+                    className="
+                      arrow-bubble absolute
+                      -bottom-2 right-6
+                      z-20 flex h-11 w-11
+                      items-center justify-center
+                      rounded-full bg-white
+                      text-[#1e3a2b]
+                      shadow-md ring-1 ring-black/5
+                      sm:right-0
+                    "
+                  >
+                    <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
+                  </a>
+                )}
               </div>
             ))}
           </div>
@@ -647,19 +722,33 @@ const Contact = () => {
       </section>
 
       {/* Map Section */}
-      <div ref={mapRef} className="overflow-hidden shadow-sm">
+      <div ref={mapRef} className="relative overflow-hidden shadow-sm">
         {/* Iframe */}
         <div className="relative h-[420px] w-full sm:h-[500px]">
           <iframe
-            src={mapEmbed}
+            src={mapSettings.embed}
             width="100%"
-            height="500px"
+            height="100%"
             style={{ border: 0 }}
             allowFullScreen
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
-            title="Mumbai Map"
+            title="Our location on Google Maps"
+            className="h-full w-full"
           />
+
+          {/* Only shown once a map link is saved in the admin panel. */}
+          {mapSettings.link && (
+            <a
+              href={mapSettings.link}
+              target="_blank"
+              rel="noreferrer"
+              className="absolute bottom-6 right-6 z-10 flex items-center gap-2 rounded-full bg-[#315537] px-6 py-3 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#16281c]"
+            >
+              Open in Google Maps
+              <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
+            </a>
+          )}
         </div>
       </div>
     </section>

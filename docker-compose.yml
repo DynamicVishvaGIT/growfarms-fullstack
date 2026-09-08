@@ -26,7 +26,7 @@ services:
     # seed images, baked into the image itself, kept working.
     #
     # A named volume (not a bind mount) on purpose: Docker seeds an empty one
-    # from the image's own /app/uploads, so uploads/seed survives the change.
+    # from the image's own /app/uploads, so uploads/seed survives the change.  
     volumes:
       - growfarms-uploads:/app/uploads
 

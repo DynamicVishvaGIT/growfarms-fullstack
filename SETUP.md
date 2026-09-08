@@ -206,7 +206,8 @@ npm run dev             # http://localhost:5174/admin
 
 Sections: Dashboard · Projects · **Project Content** · Land Packages ·
 Categories · Amenities ·
-Local Facilities · How to Reach · Enquiries · Blogs · Website Content · FAQs ·
+Local Facilities · How to Reach · Enquiries · Blogs · Website Content ·
+**Contact Page** · FAQs ·
 Testimonials · Why Pali Slides · Why Choose Cards · Buying Steps ·
 Core Philosophy · Settings · My Profile.
 
@@ -242,7 +243,8 @@ API response is also ignored, so an unseeded database can't blank a section.
 | About, Why Invest in Pali | project payload (`about_*`, `invest_*`) |
 | Blogs + blog detail | `GET /api/blogs`, `GET /api/blogs/:slug` |
 | Hero scroll copy | `GET /api/content?page=home` |
-| Footer, nav, contact cards, map embed | `/api/content`, `/api/settings` |
+| Footer, nav | `/api/content`, `/api/settings` |
+| Contact cards, map embed and map link | `/api/content?page=contact`, `/api/settings` |
 
 **Routing.** `/details` still works and shows the featured project;
 `/details/:slug` gives each project its own page. Same for

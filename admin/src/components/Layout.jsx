@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Map, Package, Tags, FileText, Inbox, Image, Sparkles,
   HelpCircle, Quote, Compass, Route, ListOrdered, Heart, Settings as Cog,
   User, LogOut, Menu, ExternalLink, Building2, ChevronDown, LayoutTemplate, Share2,
+  Contact, Landmark,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -23,7 +24,7 @@ const NAV = [
       { to: "/categories", label: "Categories", icon: Tags },
       { to: "/cms/amenities", label: "Amenities", icon: Sparkles },
       { to: "/cms/facilities", label: "Local Facilities", icon: Building2 },
-      { to: "/cms/travel-routes", label: "How to Reach", icon: Route },
+      // { to: "/cms/travel-routes", label: "How to Reach", icon: Route },
     ],
   },
   {
@@ -35,6 +36,8 @@ const NAV = [
     items: [
       { to: "/blogs", label: "Blogs", icon: FileText },
       { to: "/content", label: "Website Content", icon: Image },
+      { to: "/about-page", label: "About Page", icon: Landmark },
+      { to: "/contact-page", label: "Contact Page", icon: Contact },
       { to: "/cms/faqs", label: "FAQs", icon: HelpCircle },
       { to: "/cms/testimonials", label: "Testimonials", icon: Quote },
       { to: "/cms/why-pali-slides", label: "Why Pali Slides", icon: Compass },

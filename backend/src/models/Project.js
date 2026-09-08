@@ -43,6 +43,13 @@ module.exports = (sequelize) => {
       about_image_3: { type: DataTypes.STRING(255), allowNull: true },
       about_image_4: { type: DataTypes.STRING(255), allowNull: true },
 
+      // The heading above the three Why Choose cards. The cards themselves are
+      // their own rows in `why_choose_cards`; this is the label, headline and
+      // paragraph that introduce them, and each project names itself there.
+      why_choose_eyebrow: { type: DataTypes.STRING(80), allowNull: true },
+      why_choose_title: { type: DataTypes.STRING(200), allowNull: true },
+      why_choose_body: { type: DataTypes.TEXT, allowNull: true },
+
       invest_title: { type: DataTypes.STRING(200), allowNull: true },
       invest_body: { type: DataTypes.TEXT, allowNull: true },
       invest_image: { type: DataTypes.STRING(255), allowNull: true },

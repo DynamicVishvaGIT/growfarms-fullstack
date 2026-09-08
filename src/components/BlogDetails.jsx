@@ -4,68 +4,14 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 import BlogBanner from "../assets/images/blog_details.png";
 import logo_img from "../assets/images/grow-farms-logo.png";
-import farmImg1 from "../assets/images/farm_couple_1.jpg";
-import farmImg2 from "../assets/images/farm_couple_1.jpg";
-import blogThumb from "../assets/images/Blog_Banner_2.jpeg";
 
 import { Link, useParams, useNavigate } from "react-router-dom";
 import useApiData from "../hooks/useApiData";
-import { getBlog, getBuyingSteps } from "../lib/api";
+import { getBlog, getContent, contentBlock } from "../lib/api";
 import { blogPlainText, readingTimeMinutes } from "../lib/blogContent";
 import BlogContent from "./BlogContent";
 
 gsap.registerPlugin(ScrollTrigger);
-
-/* The designed article at /blog-details (no slug) keeps its built-in copy —
-   these are only ever used on that route, never to stand in for a real post. */
-const FALLBACK_CHECKLIST = [
-  "Make ridges when planting crops on your farm of flat land.",
-  "Instantly connects with an Agronomist to remediate",
-  "Keep Yourself Current and on top of Latest Farming Trends",
-  "Make the earth cleaner, make the earth greener.",
-];
-
-const FALLBACK_STEPS = [
-  {
-    n: "01",
-    title: "Choose Your Plot",
-    desc: "Explore our premium agricultural land options and select the perfect location.",
-  },
-  {
-    n: "02",
-    title: "Visit the Site",
-    desc: "Schedule a site visit with our experts to experience the project firsthand.",
-  },
-  {
-    n: "03",
-    title: "Complete Your Investment",
-    desc: "Our team assists you throughout the documentation process, ensuring a smooth and transparent purchase.",
-  },
-];
-
-const FALLBACK_OTHER_BLOGS = [
-  {
-    image: blogThumb,
-    category: "Mixed Farming",
-    date: "March 28, 2024",
-    author: "Admin",
-    title: "Better Agriculture for Better Future",
-  },
-  {
-    image: blogThumb,
-    category: "Mixed Farming",
-    date: "March 28, 2024",
-    author: "Admin",
-    title: "A farmer is a person who works in agriculture.",
-  },
-  {
-    image: blogThumb,
-    category: "Mixed Farming",
-    date: "March 28, 2024",
-    author: "Admin",
-    title: "A farmer is a person who works in agriculture.",
-  },
-];
 
 const CheckIcon = () => (
   <svg viewBox="0 0 24 24" className="w-full h-full">
@@ -143,7 +89,6 @@ const BackIcon = () => (
   </svg>
 );
 
-/** Match the uppercase meta line the related-post cards already use. */
 function formatMetaDate(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -151,7 +96,6 @@ function formatMetaDate(value) {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
-/** Keep the document head in step with the post being read. */
 function useDocumentMeta(post) {
   useEffect(() => {
     if (!post) return undefined;
@@ -160,7 +104,7 @@ function useDocumentMeta(post) {
     document.title = post.meta_title || `${post.title} | Grow Farms`;
 
     const description =
-      post.meta_description || post.excerpt || blogPlainText(post.content, 155);
+      post.meta_description || blogPlainText(post.content, 155);
 
     let tag = document.querySelector('meta[name="description"]');
     const created = !tag;
@@ -180,8 +124,6 @@ function useDocumentMeta(post) {
   }, [post]);
 }
 
-/* ── Small pieces ────────────────────────────────────────────────────────── */
-
 const MetaRow = ({ items, className = "" }) => (
   <div
     className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] sm:text-xs tracking-wide uppercase text-[#B9C4AE] ${className}`}
@@ -195,7 +137,6 @@ const MetaRow = ({ items, className = "" }) => (
   </div>
 );
 
-/** Copy-link share control; uses the native share sheet where there is one. */
 const ShareRow = ({ title }) => {
   const [copied, setCopied] = useState(false);
 
@@ -285,24 +226,12 @@ const NotFound = () => (
   </div>
 );
 
-/* ── Page ────────────────────────────────────────────────────────────────── */
-
 const BlogDetails = () => {
   const [heroVisible, setHeroVisible] = useState(false);
 
   const { slug } = useParams();
   const navigate = useNavigate();
 
-  // Without a slug this stays exactly the static article it has always been.
-  //
-  // This does not use `useApiData`: that hook deliberately keeps the previous
-  // response on screen while the next one loads, which is right for a section
-  // of a page but wrong for a whole article — following a related-post link to
-  // a slug that no longer resolves would leave the article you just came from
-  // sitting under the new URL. Here the post is tied to the slug that asked
-  // for it, so anything else is a real loading or missing state.
-  // The stored result carries the slug it answers, so the moment the route
-  // changes the derivation below reports "loading" without an extra render.
   const [result, setResult] = useState({ slug: null, post: null, status: "idle" });
 
   useEffect(() => {
@@ -328,36 +257,45 @@ const BlogDetails = () => {
 
   const isForThisSlug = Boolean(slug) && result.slug === slug;
   const post = isForThisSlug ? result.post : null;
-  const status = !slug ? "static" : isForThisSlug ? result.status : "loading";
+  const status = !slug ? "missing" : isForThisSlug ? result.status : "loading";
 
-  const isCms = Boolean(slug);
   const loadingPost = status === "loading";
   const notFound = status === "missing";
 
   useDocumentMeta(post);
 
-  const { data: steps } = useApiData(
-    async (signal) => {
-      const rows = await getBuyingSteps({ scope: "blog" }, signal);
-      if (!rows?.length) return null;
-      return rows.map((r) => ({
-        n: r.step_number,
-        title: r.title,
-        desc: r.description || "",
-      }));
-    },
-    FALLBACK_STEPS,
+  // The two page-wide labels, from Admin → Content → Blogs. Both fall back to
+  // the wording the page shipped with, so an unreachable backend changes nothing.
+  const { data: pageContent } = useApiData((signal) => getContent("blogs", signal), null, []);
+  const heroBlock = contentBlock(pageContent, "blogs", "detail_hero");
+  const relatedBlock = contentBlock(pageContent, "blogs", "detail_related");
+
+  // Steps ride along with the post. The API already substitutes the shared
+  // scope-"blog" list for a post that defines none, so there is one list here
+  // either way.
+  const steps = useMemo(
+    () =>
+      (post?.steps || []).map((s) => ({
+        n: s.step_number,
+        title: s.title,
+        desc: s.description || "",
+      })),
+    [post],
   );
 
-  const checklist = post
-    ? (post.checklist || []).map((c) => c.item_text)
-    : FALLBACK_CHECKLIST;
+  const checklist = (post?.checklist || []).map((c) => c.item_text);
+
+  // Heading, paragraph and ticked list all come from Admin → Blogs → Takeaways.
+  // A post that fills in none of the three drops the section entirely.
+  const takeawayHeading = (post?.sub_heading || "").trim();
+  const takeawayBody = (post?.second_description || "").trim();
+  const hasTakeaways = Boolean(takeawayHeading || takeawayBody || checklist.length);
 
   const relatedPosts = useMemo(() => {
-    if (!post) return FALLBACK_OTHER_BLOGS;
-    return (post.related || []).map((r) => ({
+    if (!post?.related?.length) return [];
+    return post.related.map((r) => ({
       slug: r.slug,
-      image: r.featured_image_url || r.banner_image_url || blogThumb,
+      image: r.featured_image_url || r.banner_image_url || null,
       category: r.category?.name || "Grow Farms",
       date: formatMetaDate(r.published_at || r.createdAt),
       author: r.author_name || "Admin",
@@ -366,17 +304,35 @@ const BlogDetails = () => {
   }, [post]);
 
   const bannerImage = post?.banner_image_url || post?.featured_image_url || BlogBanner;
-  const postTitle = post?.title || "Better Agriculture for a Better Future";
-  const heroSubtitle =
-    post?.excerpt ||
-    (post ? blogPlainText(post.content, 160) : null) ||
-    "At Grow Farms, we believe that owning agricultural land is more than an investment";
+  const postTitle = post?.title || "";
 
-  // A featured image only earns a slot in the body when it isn't the banner.
-  const inlineImage =
-    post?.featured_image_url && post.featured_image_url !== post.banner_image_url
-      ? post.featured_image_url
-      : null;
+  // Wording over the banner: the post's own first, then the Content block, and
+  // finally the post's title so the banner is never left bare.
+  const heroHeading =
+    (post?.hero_title || "").trim() || (heroBlock?.title || "").trim() || postTitle;
+  const heroSubtitle = (post?.hero_subtitle || "").trim();
+
+  const backLabel = (heroBlock?.link_label || "").trim() || "All blogs";
+  const relatedHeading = (relatedBlock?.title || "").trim() || "Other Blog";
+
+  // The image row under the body. Uploaded gallery images win; with none, the
+  // featured image still appears inline when it differs from the banner, which
+  // is what the page did before the gallery existed.
+  const galleryImages = useMemo(() => {
+    const rows = (post?.images || [])
+      .map((img) => ({
+        key: img.id,
+        src: img.image_path_url,
+        alt: img.alt_text || post?.title || "",
+      }))
+      .filter((img) => img.src);
+    if (rows.length) return rows;
+
+    if (post?.featured_image_url && post.featured_image_url !== post.banner_image_url) {
+      return [{ key: "featured", src: post.featured_image_url, alt: post.title || "" }];
+    }
+    return [];
+  }, [post]);
 
   const readMinutes = post ? readingTimeMinutes(post.content) : 0;
 
@@ -395,30 +351,20 @@ const BlogDetails = () => {
     return () => cancelAnimationFrame(t);
   }, []);
 
-  // Arriving from a related-post card is a client-side push, which keeps the
-  // previous article's scroll position.
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [slug]);
 
-  /* ---------- Page-wide ref (scopes the GSAP context) ---------- */
   const pageRef = useRef(null);
+  const detailsRef = useRef(null);
+  const imgsRef = useRef(null);
+  const growRef = useRef(null);
+  const stepsWrapRef = useRef(null);
+  const quoteRef = useRef(null);
+  const otherBlogRef = useRef(null);
 
-  /* ---------- Section-level refs — same granularity as About.jsx ---------- */
-  const detailsRef = useRef(null); // title + meta + body
-  const imgsRef = useRef(null); // image pair / featured figure
-  const growRef = useRef(null); // checklist block
-  const stepsWrapRef = useRef(null); // numbered steps grid
-  const quoteRef = useRef(null); // quote card
-  const otherBlogRef = useRef(null); // whole "Other Blog" section
-
-  // The article's own content decides how tall every section is, so the
-  // reveals are built against the finished DOM rather than the skeleton —
-  // triggers created over the loading state measure a layout that is about to
-  // be replaced, and then fire at the wrong scroll position or not at all.
   const revealKey = loadingPost || notFound ? "pending" : post?.id || "static";
 
-  /* ---------- GSAP ScrollTrigger — About.jsx-style section reveals ---------- */
   useLayoutEffect(() => {
     if (revealKey === "pending") return undefined;
 
@@ -428,8 +374,6 @@ const BlogDetails = () => {
 
     if (prefersReducedMotion) return undefined;
 
-    // Collect every section we animate so the safety-net fallback below can
-    // force them visible if something upstream still goes wrong.
     const revealTargets = [
       detailsRef.current,
       imgsRef.current,
@@ -452,10 +396,6 @@ const BlogDetails = () => {
           const travel = isMobile ? 24 : 40;
           const dur = isMobile ? 0.6 : 0.9;
 
-          // Shared helper — always fromTo so the final state is explicit. The
-          // late "top 95%" start means an element only has to be barely inside
-          // the viewport to fire, which tolerates the small layout differences
-          // between a local dev server and production.
           const reveal = (el, extraFrom = {}, extraTo = {}, startPos = "top 95%") => {
             if (!el) return;
             gsap.fromTo(
@@ -487,7 +427,6 @@ const BlogDetails = () => {
           );
           reveal(otherBlogRef.current);
 
-          /* ---- Image-load + resize refresh (identical to About.jsx) --- */
           const images = pageRef.current
             ? Array.from(pageRef.current.querySelectorAll("img"))
             : [];
@@ -512,9 +451,6 @@ const BlogDetails = () => {
           };
           window.addEventListener("resize", onResize);
 
-          // A second refresh once the whole window — fonts included — is done.
-          // Production hosts are slower than a dev server, so late assets can
-          // shift the layout after the image-based refresh has already run.
           const onWindowLoad = () => ScrollTrigger.refresh();
           window.addEventListener("load", onWindowLoad);
 
@@ -531,9 +467,6 @@ const BlogDetails = () => {
       );
     }, pageRef);
 
-    // Safety net: if a section never received its ScrollTrigger-driven "to"
-    // state within 2.5s (blocked chunk, failed dynamic import, matchMedia edge
-    // case), force it visible. Content must never be permanently invisible.
     const safetyTimer = setTimeout(() => {
       revealTargets.forEach((el) => {
         if (parseFloat(window.getComputedStyle(el).opacity) < 1) {
@@ -544,7 +477,7 @@ const BlogDetails = () => {
 
     return () => {
       clearTimeout(safetyTimer);
-      ctx.revert(); // kills all ScrollTriggers created inside ctx
+      ctx.revert();
     };
   }, [revealKey]);
 
@@ -556,7 +489,6 @@ const BlogDetails = () => {
       {/* ---------------- HERO ---------------- */}
       <section className="relative w-full h-[60vh] min-h-[420px] sm:h-[70vh] sm:min-h-[500px] md:h-screen md:min-h-[650px] overflow-hidden">
         <div className="relative w-full h-full">
-          {/* Hero Image */}
           <img
             src={bannerImage}
             alt={postTitle}
@@ -576,7 +508,6 @@ const BlogDetails = () => {
             }}
           />
 
-          {/* Top Logo */}
           <div
             className="
               absolute
@@ -615,7 +546,6 @@ const BlogDetails = () => {
             </Link>
           </div>
 
-          {/* Hero Content */}
           <div
             className="
               absolute
@@ -635,79 +565,62 @@ const BlogDetails = () => {
             "
           >
             <div className="w-full max-w-[850px] text-center text-white">
-              {post?.category?.name && (
-                <span
+              {heroHeading && (
+                <h1
                   className="
-                    inline-block mb-4
-                    rounded-full bg-[#F4EDE1] text-[#1F3B22]
-                    px-3 py-1
-                    text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider
+                    font-semibold
+                    tracking-[0.06em]
+                    sm:tracking-[0.08em]
+                    leading-tight
+                    text-[20px]
+                    min-[400px]:text-[22px]
+                    sm:text-[26px]
+                    md:text-[32px]
+                    lg:text-[38px]
+                    xl:text-[42px]
                     transition-all duration-700 ease-out
                     motion-reduce:transition-none
                   "
                   style={{
                     opacity: heroVisible ? 1 : 0,
-                    transform: heroVisible ? "translateY(0)" : "translateY(12px)",
-                    transitionDelay: "80ms",
+                    transform: heroVisible ? "translateY(0)" : "translateY(16px)",
+                    transitionDelay: "150ms",
                   }}
                 >
-                  {post.category.name}
-                </span>
+                  {heroHeading}
+                </h1>
               )}
 
-              <h1
-                className="
-                  font-semibold
-                  tracking-[0.06em]
-                  sm:tracking-[0.08em]
-                  leading-tight
-                  text-[20px]
-                  min-[400px]:text-[22px]
-                  sm:text-[26px]
-                  md:text-[32px]
-                  lg:text-[38px]
-                  xl:text-[42px]
-                  transition-all duration-700 ease-out
-                  motion-reduce:transition-none
-                "
-                style={{
-                  opacity: heroVisible ? 1 : 0,
-                  transform: heroVisible ? "translateY(0)" : "translateY(16px)",
-                  transitionDelay: "150ms",
-                }}
-              >
-                {postTitle}
-              </h1>
-
-              <p
-                className="
-                  mx-auto
-                  mt-2
-                  max-w-[90%]
-                  sm:max-w-[650px]
-                  leading-relaxed
-                  tracking-[0.08em]
-                  sm:tracking-[0.12em]
-                  text-[11px]
-                  min-[400px]:text-[12px]
-                  sm:text-[14px]
-                  md:text-[16px]
-                  lg:text-[18px]
-                  transition-all duration-700 ease-out
-                  motion-reduce:transition-none
-                "
-                style={{
-                  opacity: heroVisible ? 1 : 0,
-                  transform: heroVisible ? "translateY(0)" : "translateY(14px)",
-                  transitionDelay: "300ms",
-                }}
-              >
-                {heroSubtitle}
-              </p>
+              {heroSubtitle && (
+                <p
+                  className="
+                    mx-auto
+                    mt-2
+                    max-w-[90%]
+                    sm:max-w-[650px]
+                    leading-relaxed
+                    tracking-[0.08em]
+                    sm:tracking-[0.12em]
+                    text-[11px]
+                    min-[400px]:text-[12px]
+                    sm:text-[14px]
+                    md:text-[16px]
+                    lg:text-[18px]
+                    transition-all duration-700 ease-out
+                    motion-reduce:transition-none
+                  "
+                  style={{
+                    opacity: heroVisible ? 1 : 0,
+                    transform: heroVisible ? "translateY(0)" : "translateY(14px)",
+                    transitionDelay: "300ms",
+                  }}
+                >
+                  {heroSubtitle}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Bottom Green Gradient */}
           <div
             className="pointer-events-none absolute bottom-0 left-0 z-20 w-full"
             style={{
@@ -729,183 +642,140 @@ const BlogDetails = () => {
       {/* ---------------- DETAILS SECTION ---------------- */}
       <section className="relative bg-[#315537] text-[#EDE7D9] px-5 sm:px-10 lg:px-16 pt-14 sm:pt-20 lg:pt-8 pb-16 sm:pb-20 lg:pb-40">
         <div className="relative max-w-6xl mx-auto">
-          {/* Intro / article body */}
           <div ref={detailsRef}>
-            {isCms && (
-              <Link
-                to="/blogs"
-                className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs uppercase tracking-wider text-[#B9C4AE] transition-colors hover:text-[#F4EDE1]"
-              >
-                <BackIcon />
-                All blogs
-              </Link>
-            )}
+            <Link
+              to="/blogs"
+              className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs uppercase tracking-wider text-[#B9C4AE] transition-colors hover:text-[#F4EDE1]"
+            >
+              <BackIcon />
+              {backLabel}
+            </Link>
 
-            <h1 className="mt-4 font-display text-2xl sm:text-4xl lg:text-[2.75rem] font-medium leading-tight text-[#F4EDE1] max-w-4xl">
-              {post?.title || "Better Agriculture for Better Future"}
-            </h1>
+            {postTitle && (
+              <h1 className="mt-4 font-display text-2xl sm:text-4xl lg:text-[2.75rem] font-medium leading-tight text-[#F4EDE1] max-w-4xl">
+                {postTitle}
+              </h1>
+            )}
 
             {metaItems.length > 0 && (
               <MetaRow items={metaItems} className="mt-4 border-t border-[#EDE7D9]/10 pt-4" />
             )}
 
-            {post ? (
+            {post && (
               <div className="mt-6 max-w-3xl lg:max-w-4xl">
-                {post.excerpt && (
-                  <p className="mb-6 text-[15px] sm:text-base lg:text-lg leading-relaxed text-[#EDE7D9]">
-                    {post.excerpt}
-                  </p>
-                )}
                 <BlogContent raw={post.content} />
-              </div>
-            ) : (
-              <div className="mt-5 space-y-4 max-w-3xl lg:max-w-6xl text-[#D8CFBB] text-[14px] sm:text-[15px] lg:text-base leading-relaxed">
-                <p>
-                  At Grow Farms, we believe that owning agricultural land is more than an
-                  investment&mdash;it&rsquo;s a step toward a healthier, more peaceful
-                  lifestyle. Surrounded by nature, our farm projects offer the perfect
-                  balance of modern convenience and natural beauty, making them ideal for
-                  farming, weekend homes, or long-term investment.
-                </p>
-                <p>
-                  Our carefully developed agricultural plots come with essential
-                  infrastructure, including internal roads, water supply, electricity,
-                  fencing, and plantation. Every project is designed to provide a
-                  hassle-free experience while preserving the beauty of nature and
-                  promoting sustainable living.
-                </p>
               </div>
             )}
 
-            {isCms && <ShareRow title={postTitle} />}
+            <ShareRow title={postTitle} />
           </div>
 
-          {/* Imagery — the designed pair on the static page, the post's own
-              featured image on a CMS article that has one. */}
-          {post ? (
-            inlineImage && (
-              <div ref={imgsRef} className="mt-10 sm:mt-12">
-                <div className="rounded-2xl overflow-hidden aspect-[16/9] shadow-xl shadow-black/20 max-w-4xl">
-                  <img
-                    src={inlineImage}
-                    alt={postTitle}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            )
-          ) : (
-            <div
-              ref={imgsRef}
-              className="mt-8 sm:mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"
-            >
-              <div className="rounded-2xl overflow-hidden aspect-[4/3] shadow-xl shadow-black/20 group">
-                <img
-                  src={farmImg1}
-                  alt="Couple checking crop data on a tablet in the field"
-                  loading="lazy"
-                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-                />
-              </div>
-              <div className="rounded-2xl overflow-hidden aspect-[4/3] shadow-xl shadow-black/20 group">
-                <img
-                  src={farmImg2}
-                  alt="Couple checking crop data on a tablet in the field"
-                  loading="lazy"
-                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Checklist — hidden entirely when a post has no items of its own */}
-          {checklist.length > 0 && (
-            <div ref={growRef} className="mt-14 sm:mt-20 max-w-4xl">
-              <h2 className="font-display text-xl sm:text-3xl font-medium text-[#F4EDE1]">
-                {post ? "Key takeaways" : "Everything on our farm is grown"}
-              </h2>
-
-              {!post && (
-                <p className="mt-4 text-[#D8CFBB] text-[14px] sm:text-[15px] leading-relaxed max-w-5xl">
-                  They offer adaptability, high nutritional value, and can yield higher
-                  yields with minimal agronomic inputs, and provide{" "}
-                  <span className="text-[#C7DDB5] underline decoration-[#C7DDB5]/50 underline-offset-2">
-                    significant potential for sustainable
-                  </span>{" "}
-                  agriculture and provide nutritional and income security for small and
-                  marginal farmers in dry and rainfed semi-arid regions.
-                </p>
-              )}
-
-              <div className="mt-6 space-y-4 sm:space-y-5">
-                {checklist.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="tick-check w-5 h-5 shrink-0 mt-0.5">
-                      <CheckIcon />
-                    </span>
-                    <p className="text-[#EDE7D9] text-[14px] sm:text-[15px] leading-snug">
-                      {item}
-                    </p>
+          {galleryImages.length > 0 && (
+            <div ref={imgsRef} className="mt-10 sm:mt-12 max-w-4xl">
+              <div
+                className={`grid gap-4 sm:gap-6 ${
+                  galleryImages.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"
+                }`}
+              >
+                {galleryImages.map((img) => (
+                  <div
+                    key={img.key}
+                    className="rounded-2xl overflow-hidden aspect-[16/9] shadow-xl shadow-black/20"
+                  >
+                    <img
+                      src={img.src}
+                      alt={img.alt}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Numbered steps */}
+          {hasTakeaways && (
+            <div ref={growRef} className="mt-14 sm:mt-20 max-w-4xl">
+              <h2 className="font-display text-xl sm:text-3xl font-medium text-[#F4EDE1]">
+                {takeawayHeading || "Key takeaways"}
+              </h2>
+
+              {takeawayBody && (
+                <p className="mt-4 max-w-3xl whitespace-pre-line text-[#C9C0AC] text-[14px] sm:text-[15px] leading-relaxed">
+                  {takeawayBody}
+                </p>
+              )}
+
+              {checklist.length > 0 && (
+                <div className="mt-6 space-y-4 sm:space-y-5">
+                  {checklist.map((item, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <span className="tick-check w-5 h-5 shrink-0 mt-0.5">
+                        <CheckIcon />
+                      </span>
+                      <p className="text-[#EDE7D9] text-[14px] sm:text-[15px] leading-snug">
+                        {item}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {steps?.length > 0 && (
+            <div
+              ref={stepsWrapRef}
+              className="mt-14 sm:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-8"
+            >
+              {steps.map((s) => (
+                <div key={s.n}>
+                  <span className="font-display text-3xl sm:text-5xl text-[#F4EDE1]">
+                    {s.n}
+                  </span>
+                  <div className="step-dot w-1.5 h-1.5 rounded-full bg-[#C7DDB5] my-3" />
+                  <h3 className="text-base sm:text-lg font-semibold text-[#F4EDE1]">
+                    {s.title}
+                  </h3>
+                  <p className="mt-2 text-[#C9C0AC] text-sm leading-relaxed">{s.desc}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {post?.quote_text && (
           <div
-            ref={stepsWrapRef}
-            className="mt-14 sm:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-8"
+            ref={quoteRef}
+            className="
+              relative
+              lg:absolute lg:inset-x-0 lg:-bottom-16
+              mt-10 sm:mt-14 lg:mt-0
+              w-full lg:w-[90%]
+              max-w-full sm:max-w-2xl lg:max-w-5xl
+              mx-auto
+              bg-white rounded-3xl
+              p-5 sm:p-8 lg:p-10
+              shadow-lg
+              flex items-start gap-4 sm:gap-6
+            "
           >
-            {steps.map((s) => (
-              <div key={s.n}>
-                <span className="font-display text-3xl sm:text-5xl text-[#F4EDE1]">
-                  {s.n}
-                </span>
-                <div className="step-dot w-1.5 h-1.5 rounded-full bg-[#C7DDB5] my-3" />
-                <h3 className="text-base sm:text-lg font-semibold text-[#F4EDE1]">
-                  {s.title}
-                </h3>
-                <p className="mt-2 text-[#C9C0AC] text-sm leading-relaxed">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+            <div className="flex-shrink-0 w-10 h-10 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-full bg-[#34533C] flex items-center justify-center">
+              <QuoteMark className="w-4 h-4 sm:w-6 sm:h-6 lg:w-7 lg:h-7 fill-current text-white" />
+            </div>
 
-        {/* Quote card */}
-        <div
-          ref={quoteRef}
-          className="
-            relative
-            lg:absolute lg:inset-x-0 lg:-bottom-16
-            mt-10 sm:mt-14 lg:mt-0
-            w-full lg:w-[90%]
-            max-w-full sm:max-w-2xl lg:max-w-5xl
-            mx-auto
-            bg-white rounded-3xl
-            p-5 sm:p-8 lg:p-10
-            shadow-lg
-            flex items-start gap-4 sm:gap-6
-          "
-        >
-          {/* Circular Quote Mark Icon Container */}
-          <div className="flex-shrink-0 w-10 h-10 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-full bg-[#34533C] flex items-center justify-center">
-            <QuoteMark className="w-4 h-4 sm:w-6 sm:h-6 lg:w-7 lg:h-7 fill-current text-white" />
+            <div className="flex-1 pt-0.5 sm:pt-1.5 lg:pt-2">
+              <p className="text-[#333333] text-sm sm:text-lg lg:text-xl leading-relaxed whitespace-pre-line">
+                &ldquo;{post.quote_text}&rdquo;
+              </p>
+              {post.quote_author && (
+                <p className="mt-3 sm:mt-4 text-[11px] sm:text-sm tracking-wider uppercase text-[#526B57] font-semibold">
+                  - {post.quote_author}
+                </p>
+              )}
+            </div>
           </div>
-
-          {/* Text Content */}
-          <div className="flex-1 pt-0.5 sm:pt-1.5 lg:pt-2">
-            <p className="text-[#333333] text-sm sm:text-lg lg:text-xl leading-relaxed">
-              &ldquo;When you listen to yourself, everything come naturally. It come
-              from in, like a kind of will to do something. Try to be sensitive. That
-              is just a few clicks away.&rdquo;
-            </p>
-            <p className="mt-3 sm:mt-4 text-[11px] sm:text-sm tracking-wider uppercase text-[#526B57] font-semibold">
-              - SATISFIED CLIENT
-            </p>
-          </div>
-        </div>
+        )}
       </section>
 
       {/* ---------------- OTHER BLOG ---------------- */}
@@ -913,39 +783,44 @@ const BlogDetails = () => {
         <div ref={otherBlogRef}>
           <section className="relative text-[#EDE7D9] px-5 sm:px-10 lg:px-16 pt-10 sm:pt-16 lg:pt-28 pb-16 sm:pb-20 lg:pb-24 overflow-hidden">
             <h2 className="font-display text-center text-lg sm:text-2xl font-medium text-[#F4EDE1] underline decoration-1 underline-offset-8">
-              Other Blog
+              {relatedHeading}
             </h2>
 
             <div className="mt-10 sm:mt-14 max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
               {relatedPosts.map((blog, i) => (
                 <article
                   key={blog.slug || i}
-                  className={blog.slug ? "group cursor-pointer" : "group"}
+                  className="group cursor-pointer"
                   onClick={() => blog.slug && navigate(`/blog-details/${blog.slug}`)}
                 >
                   <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-xl shadow-black/20">
-                    <img
-                      src={blog.image}
-                      alt={blog.title}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.src = blogThumb;
-                      }}
-                      className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-                    />
+                    {blog.image ? (
+                      <img
+                        src={blog.image}
+                        alt={blog.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-[#2a4830] flex items-center justify-center">
+                        <img
+                          src={logo_img}
+                          alt=""
+                          aria-hidden="true"
+                          className="w-1/2 max-w-[110px] object-contain opacity-20"
+                        />
+                      </div>
+                    )}
 
-                    {/* category pill */}
                     <span className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-[#F4EDE1] text-[#1F3B22] text-[10px] sm:text-[11px] font-semibold tracking-wide uppercase px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
                       {blog.category}
                     </span>
 
-                    {/* circular action button */}
                     <span className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E8D24C] flex items-center justify-center shadow-md transition-transform duration-500 ease-out group-hover:rotate-45 motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                       <ArrowIcon />
                     </span>
                   </div>
 
-                  {/* meta row */}
                   <div className="mt-3 sm:mt-4 flex items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] tracking-wide uppercase text-[#B9C4AE]">
                     {blog.date && (
                       <span className="flex items-center gap-1.5">
@@ -959,7 +834,6 @@ const BlogDetails = () => {
                     </span>
                   </div>
 
-                  {/* title */}
                   <h3 className="mt-2 sm:mt-2.5 text-[#F4EDE1] text-sm sm:text-base lg:text-lg font-medium leading-snug">
                     {blog.title}
                   </h3>

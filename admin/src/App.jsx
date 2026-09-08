@@ -17,6 +17,8 @@ import Blogs from "./pages/Blogs";
 import BlogForm from "./pages/BlogForm";
 import Enquiries from "./pages/Enquiries";
 import Content from "./pages/Content";
+import ContactPage from "./pages/ContactPage";
+import AboutPage from "./pages/AboutPage";
 import CmsList from "./pages/CmsList";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
@@ -78,6 +80,8 @@ export default function App() {
 
             <Route path="enquiries" element={<Enquiries />} />
             <Route path="content" element={<Content />} />
+            <Route path="contact-page" element={<ContactPage />} />
+            <Route path="about-page" element={<AboutPage />} />
 
             {/* One page serves all nine simple CMS lists. */}
             <Route path="cms/:resource" element={<CmsList />} />

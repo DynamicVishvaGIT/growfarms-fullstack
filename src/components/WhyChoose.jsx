@@ -72,8 +72,25 @@ function mergeCards(rows) {
   });
 }
 
+/* The heading as the page ships. Only the project's name is substituted, so
+   an unedited project reads exactly as the design does. */
+const FALLBACK_EYEBROW = "The Advantage";
+const FALLBACK_BODY =
+  "Pali is becoming a preferred destination for families, investors, and " +
+  "weekend home buyers because it offers a peaceful environment while " +
+  "staying well-connected to major cities. Unlike crowded urban areas, Pali " +
+  "provides open spaces, cleaner air, and a nature-centric lifestyle without " +
+  "sacrificing convenience.";
+
 export default function Aboutsarasview() {
   const project = useProject();
+
+  // Admin -> Project Content -> Why Choose Us writes these three; each falls
+  // back on its own, so filling in only the headline is a complete edit.
+  const eyebrow = project?.why_choose_eyebrow || FALLBACK_EYEBROW;
+  const headline =
+    project?.why_choose_title || `Why Choose ${project?.title || "Sarasview"}?`;
+  const bodyText = project?.why_choose_body || FALLBACK_BODY;
 
   const { data: CARDS } = useApiData(
     async (signal) => {
@@ -466,6 +483,10 @@ export default function Aboutsarasview() {
 
           margin-bottom: 1rem;
 
+          /* The headline is admin copy now, so a long project name wraps
+             rather than running past the header. */
+          overflow-wrap: break-word;
+
           opacity: 0;
         }
 
@@ -481,6 +502,8 @@ export default function Aboutsarasview() {
           max-width: 990px;
 
           margin: 0 auto;
+
+          overflow-wrap: break-word;
 
           opacity: 0;
         }
@@ -891,7 +914,7 @@ export default function Aboutsarasview() {
             ref={eyebrowRef}
             className="wc-eyebrow"
           >
-            The Advantage
+            {eyebrow}
           </p>
 
 
@@ -899,7 +922,7 @@ export default function Aboutsarasview() {
             ref={headlineRef}
             className="wc-headline"
           >
-            Why Choose Sarasview?
+            {headline}
           </h2>
 
 
@@ -907,12 +930,7 @@ export default function Aboutsarasview() {
             ref={paraRef}
             className="wc-para sub_font"
           >
-            Pali is becoming a preferred destination for families,
-            investors, and weekend home buyers because it offers a
-            peaceful environment while staying well-connected to
-            major cities. Unlike crowded urban areas, Pali provides
-            open spaces, cleaner air, and a nature-centric lifestyle
-            without sacrificing convenience.
+            {bodyText}
           </p>
 
         </div>
