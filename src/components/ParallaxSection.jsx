@@ -80,7 +80,7 @@ const ParallaxSection = () => {
           </p>
 
           {/* Explore More Button */}
-          <div className="relative flex items-center justify-center">
+          {/* <div className="relative flex items-center justify-center">
             <div
               className="absolute rounded-full border border-white/40 animate-pulse"
               style={{
@@ -103,7 +103,7 @@ const ParallaxSection = () => {
               <br />
               More
             </button>
-          </div>
+          </div> */}
         </div>
 
         {/* Bottom green hills */}
