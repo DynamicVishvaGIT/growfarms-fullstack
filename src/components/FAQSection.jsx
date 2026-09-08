@@ -137,7 +137,14 @@ function FAQItem({ faq, index, isOpen, onToggle, initialOpen }) {
 
   /* ── 2. Scroll reveal ─────────────────────────────────────────── */
   useEffect(() => {
-    if (prefersReduced()) return;
+    // The row is authored hidden (opacity: 0 inline) so the reveal has
+    // something to fade in from. With motion reduced there is no reveal at
+    // all — so without this the FAQ never becomes visible rather than just
+    // appearing without the animation.
+    if (prefersReduced()) {
+      gsap.set(itemRef.current, { opacity: 1, y: 0 });
+      return;
+    }
     const ctx = gsap.context(() => {
       gsap.fromTo(
         itemRef.current,
@@ -357,7 +364,16 @@ export default function FAQSection() {
 
   /* heading reveal */
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // Same as the rows below: the heading is authored at opacity 0 and
+      // only the tween brings it back, so it has to be settled by hand here.
+      gsap.set(headingRef.current, {
+        opacity: 1,
+        y: 0,
+        letterSpacing: "0.08em",
+      });
+      return;
+    }
     const ctx = gsap.context(() => {
       gsap.fromTo(
         headingRef.current,

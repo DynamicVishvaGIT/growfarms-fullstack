@@ -627,11 +627,22 @@ gsap.registerPlugin(ScrollTrigger);
 // ─── constants ────────────────────────────────────────────────────────────────
 const BG_COLOR = "#163f1f";
 
+// ── FIX: Pin की height = 100vh (sticky) + सिर्फ उतना scroll जितने में
+// animation पूरी होती है। पहले 600vh/400vh था जिसमें आखिरी 40% dead scroll था —
+// इसीलिए animation खत्म होने के बाद दूसरी बार scroll करना पड़ता था।
+// Scroll distance = pinHeight - 100vh → desktop 300vh, mobile 180vh.
+// ये बिलकुल वोही distance है जो पहले useful थी (500vh × 0.6 / 300vh × 0.6),
+// इसलिए px-per-frame यानी animation की speed बिलकुल पहले जैसी ही रहती है।
 const getPinHeight = () =>
-  window.innerWidth < 768 ? "400vh" : "600vh";
+  window.innerWidth < 768 ? "280vh" : "400vh";
 
-const TOTAL_SCROLLS = 5;
-const VIDEO_END     = 3 / TOTAL_SCROLLS; // 0.0 → 0.6
+// ── FIX: 5 → 3। Video और तीनों text stages पहले भी सिर्फ 3 segments
+// (progress 0 → 0.6) में खत्म हो जाते थे, बाकी 0.6 → 1.0 खाली पड़ा रहता था।
+// अब VIDEO_END = 1 और SEGMENT = 1/3 — यानी आखिरी frame ठीक उसी पल आता है
+// जब pin रिलीज़ होता है। Video अब भी ठीक तीनों text segments पर फैलता है और
+// हर stage को frames का वही 1/3 हिस्सा मिलता है — choreography बिलकुल unchanged।
+const TOTAL_SCROLLS = 3;
+const VIDEO_END     = 3 / TOTAL_SCROLLS; // 0.0 → 1.0 (frames पूरे pin पर फैले)
 
 // ─── Text stages ──────────────────────────────────────────────────────────────
 const TEXT_STAGES = [
