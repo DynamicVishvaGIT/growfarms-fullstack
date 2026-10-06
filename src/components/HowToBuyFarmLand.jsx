@@ -310,6 +310,7 @@ export default function HowToBuyFarmLand() {
         : Promise.resolve();
 
     let ctx;
+    let refreshTimer;
     let cancelled = false;
 
     fontsReady.then(() => {
@@ -421,16 +422,19 @@ export default function HowToBuyFarmLand() {
       // Positions were computed before fonts/layout fully settled elsewhere
       // on the page (e.g. images above this section); re-measure once more
       // on the next frame to be safe.
-      setTimeout(() => {
-  ScrollTrigger.refresh();
-}, 100);
+      refreshTimer = setTimeout(() => {
+        ScrollTrigger.refresh();
+      }, 100);
     });
 
     return () => {
       cancelled = true;
+      clearTimeout(refreshTimer);
       if (ctx) ctx.revert();
     };
-  }, []);
+    // The CMS steps replace the built-in four after mount (and can be fewer),
+    // so the tweens are rebuilt against the cards that are actually rendered.
+  }, [STEPS]);
 
 
   return (

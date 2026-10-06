@@ -42,6 +42,43 @@ const ScrollRefresh = () => {
     ScrollTrigger.refresh(true);
   }, [location.pathname]);
 
+  // ── Page की height बदलते ही ScrollTrigger को फिर से measure करवाओ
+  // Live पर API data और /uploads की images देर से आती हैं — sections बाद में
+  // लंबे/छोटे होते हैं, जबकि triggers के start/end पहले ही नप चुके होते हैं।
+  // तब animations गलत scroll position पर चलती हैं (बहुत पहले, या कभी नहीं)।
+  // Body का ResizeObserver हर ऐसे बदलाव को पकड़ता है; image `load` event
+  // capture phase में सुनते हैं क्योंकि वह bubble नहीं करता।
+  useEffect(() => {
+    let timer;
+    let lastHeight = document.documentElement.scrollHeight;
+
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const height = document.documentElement.scrollHeight;
+        // Pin spacers खुद height बदलते हैं — वही height दोबारा refresh न करे
+        if (height === lastHeight) return;
+        lastHeight = height;
+        ScrollTrigger.refresh();
+      }, 150);
+    };
+
+    const onLoad = (e) => {
+      if (e.target instanceof HTMLImageElement) schedule();
+    };
+
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    observer?.observe(document.body);
+    document.addEventListener("load", onLoad, true);
+
+    return () => {
+      clearTimeout(timer);
+      observer?.disconnect();
+      document.removeEventListener("load", onLoad, true);
+    };
+  }, []);
+
   return null;
 };
 

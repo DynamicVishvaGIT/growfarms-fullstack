@@ -340,7 +340,9 @@ function FAQItem({ faq, index, isOpen, onToggle, initialOpen }) {
 }
 
 export default function FAQSection() {
-  const [openId, setOpenId]   = useState(1);
+  // undefined = the visitor has not touched the list yet, so the first FAQ is
+  // open. Live ids come from the database (9, 10, …), never a hardcoded 1.
+  const [chosenId, setChosenId] = useState(undefined);
   const sectionRef             = useRef(null);
   const headingRef             = useRef(null);
 
@@ -358,9 +360,11 @@ export default function FAQSection() {
     [project?.id],
   );
 
+  const openId = chosenId === undefined ? faqs[0]?.id : chosenId;
+
   const toggle = useCallback((id) => {
-    setOpenId((prev) => (prev === id ? null : id));
-  }, []);
+    setChosenId(openId === id ? null : id);
+  }, [openId]);
 
   /* heading reveal */
   useEffect(() => {
@@ -419,7 +423,7 @@ export default function FAQSection() {
             faq={faq}
             index={i}
             isOpen={openId === faq.id}
-            initialOpen={faq.id === 1} // FIX: pass initialOpen for flash-free first render
+            initialOpen={faq.id === openId} // flash-free first render
             onToggle={() => toggle(faq.id)}
           />
         ))}
