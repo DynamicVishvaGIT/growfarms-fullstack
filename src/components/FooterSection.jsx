@@ -11,7 +11,7 @@ const FALLBACK_FOOTER = {
     { label: "About us", url: "/about" },
     { label: "Blog", url: "/blogs" },
     { label: "Contact", url: "/contact" },
-    { label: "Sitemap", url: "https://growfarms.co/sitemap.xml" },
+    // { label: "Sitemap", url: "https://growfarms.co/sitemap.xml" },
   ],
   projects: [
     { label: "Sky Breeze", url: "/details/skybreez" },
