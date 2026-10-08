@@ -744,7 +744,7 @@ const BlogDetails = () => {
           )}
         </div>
 
-        {post?.quote_text && (
+        {/* {post?.quote_text && (
           <div
             ref={quoteRef}
             className="
@@ -775,7 +775,7 @@ const BlogDetails = () => {
               )}
             </div>
           </div>
-        )}
+        )} */}
       </section>
 
       {/* ---------------- OTHER BLOG ---------------- */}
