@@ -16,6 +16,8 @@ import Testimonials from "./pages/Testimonials";
 import Contact from "./pages/Contact";
 import ThankYou from "./pages/ThankYou";
 import Details from "./pages/Details";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
 
 import FooterSection from "./components/FooterSection";
 import BlogDetails from "./components/BlogDetails";
@@ -73,6 +75,10 @@ const App = () => {
           <Route path="/blog-details" element={<BlogDetails />} />
 
           <Route path="/blog-details/:slug" element={<BlogDetails />} />
+
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
         </Routes>
 
         <FooterSection />

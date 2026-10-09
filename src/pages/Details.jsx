@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import DetailsBanner from "../assets/images/Details_Banner.jpg";
-
 import Hospital from "../assets/images/hospital.png";
 import School from "../assets/images/school.png";
 import College from "../assets/images/College.png";
@@ -155,7 +153,7 @@ const Details = () => {
       ? project.facilities.map((f) => ({ img: f.icon_image_url, label: f.name }))
       : FALLBACK_FACILITIES;
 
-  const bannerImage = project?.hero_image_url || DetailsBanner;
+  const bannerImage = project?.hero_image_url;
   const projectTitle = project?.title || "Sarasview";
 
   useEffect(() => {

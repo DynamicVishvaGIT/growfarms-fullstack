@@ -209,6 +209,21 @@ const FooterSection = () => {
 
         {/* Divider + Copyright */}
         <div className="relative bottom-5 lg:bottom-15">
+          <div className="mb-3 flex items-center justify-center md:justify-start gap-3 text-[11px] text-white/65 tracking-widest uppercase whitespace-nowrap">
+            <Link
+              to="/privacy-policy"
+              className="hover:text-white transition-colors duration-200"
+            >
+              Privacy Policy
+            </Link>
+            <span aria-hidden="true" className="text-white/40">|</span>
+            <Link
+              to="/terms-and-conditions"
+              className="hover:text-white transition-colors duration-200"
+            >
+              Terms &amp; Conditions
+            </Link>
+          </div>
           <p className="text-center text-[10px] text-white tracking-widest uppercase">
             {footer.copyright}
           </p>
